@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Preference } from "mercadopago";
 
 const PLANOS: Record<string, { title: string; price: number; days: number }> = {
-  mensal: { title: "MacroForge — Mensal (TESTE)", price: 2.0, days: 30 },
+  mensal: { title: "MacroForge — Mensal (TESTE)", price: 1.0, days: 30 },
   trimestral: { title: "MacroForge — Trimestral", price: 34.9, days: 90 },
   semestral: { title: "MacroForge — Semestral", price: 59.9, days: 180 },
 };
