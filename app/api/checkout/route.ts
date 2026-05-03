@@ -45,6 +45,13 @@ export async function POST(req: NextRequest) {
         payer: {
           email: email,
         },
+        back_urls: {
+          success: `${siteUrl}/sucesso`,
+          failure: `${siteUrl}/falha`,
+          pending: `${siteUrl}/pendente`,
+        },
+        auto_return: "approved",
+        notification_url: `${siteUrl}/api/webhook`,
         metadata: {
           plano: plano,
           email: email,
