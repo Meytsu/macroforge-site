@@ -43,8 +43,8 @@ export default function CheckoutButton({
         return;
       }
 
-      // No modo teste, usa sandbox_url. Em produção, usa checkout_url
-      const url = data.sandbox_url || data.checkout_url;
+      // Usa checkout_url (produção)
+      const url = data.checkout_url;
       window.location.href = url;
     } catch {
       setError("Erro ao conectar. Tente novamente.");
