@@ -5,7 +5,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#0D1117] text-white">
       {/* HERO */}
-      <section className="flex flex-col items-center justify-center px-6 pt-20 pb-16">
+      <section className="flex flex-col items-center justify-center px-6 pt-28 pb-16">
         <Image
           src="/icon.png"
           alt="MacroForge"
