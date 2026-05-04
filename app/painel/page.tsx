@@ -169,7 +169,7 @@ export default function PainelPage() {
                 <p className="text-gray-400 text-xs">Android 8.0+ | v1.0.0 | Funciona no celular e BlueStacks</p>
               </div>
               <a
-                href="https://github.com/Meytsu/macroforge-site/releases/download/v1.0.0/app-debug.apk"
+                href="https://github.com/Meytsu/macroforge-site/releases/download/v1.0.0/app-release.apk"
                 className="bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-3 rounded-xl transition-colors text-sm flex-shrink-0"
                 download
               >
