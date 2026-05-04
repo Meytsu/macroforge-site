@@ -29,10 +29,39 @@ function CadastroForm() {
   const [pais, setPais] = useState("Brasil");
   const [estado, setEstado] = useState("");
   const [cidade, setCidade] = useState("");
+  const [senha, setSenha] = useState("");
+  const [showSenha, setShowSenha] = useState(false);
+  const [senhaValida, setSenhaValida] = useState({ maiuscula: false, minuscula: false, especial: false, tamanho: false });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "exists" | "exists_no_pass" | "available">("idle");
 
   const isBrasil = pais === "Brasil";
+
+  async function checkEmail(emailValue: string) {
+    if (!emailValue || !emailValue.includes("@")) {
+      setEmailStatus("idle");
+      return;
+    }
+    setEmailStatus("checking");
+    try {
+      const res = await fetch("/api/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailValue }),
+      });
+      const data = await res.json();
+      if (data.exists && data.temSenha) {
+        setEmailStatus("exists");
+      } else if (data.exists && !data.temSenha) {
+        setEmailStatus("exists_no_pass");
+      } else {
+        setEmailStatus("available");
+      }
+    } catch {
+      setEmailStatus("idle");
+    }
+  }
 
   function handlePaisChange(novoPais: string) {
     setPais(novoPais);
@@ -47,9 +76,23 @@ function CadastroForm() {
     if (p) setPais(p.pais);
   }
 
+  function validarSenha(s: string) {
+    setSenha(s);
+    setSenhaValida({
+      tamanho: s.length >= 8,
+      maiuscula: /[A-Z]/.test(s),
+      minuscula: /[a-z]/.test(s),
+      especial: /[!@#$%&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(s),
+    });
+  }
+
+  const senhaOk = senhaValida.tamanho && senhaValida.maiuscula && senhaValida.minuscula && senhaValida.especial;
+
   async function handleSubmit() {
     if (!nome.trim()) { setError("Digite seu nome completo"); return; }
     if (!email.includes("@")) { setError("Digite um e-mail valido"); return; }
+    if (emailStatus === "exists") { setError("E-mail ja cadastrado. Faca login."); return; }
+    if (!senhaOk) { setError("Senha nao atende os requisitos"); return; }
     if (!telefone.trim()) { setError("Digite seu numero de contato"); return; }
     if (!pais.trim()) { setError("Selecione seu pais"); return; }
 
@@ -57,6 +100,30 @@ function CadastroForm() {
     setError("");
 
     try {
+      // 1. Registra o cliente com senha
+      const regRes = await fetch("/api/registro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome,
+          email,
+          senha,
+          whatsapp: `${codigoPais} ${telefone}`,
+          pais,
+          estado,
+          cidade,
+          codigo_pais: codigoPais,
+        }),
+      });
+
+      const regData = await regRes.json();
+      if (regData.error) {
+        setError(regData.error);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Gera o checkout do Mercado Pago
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,10 +217,68 @@ function CadastroForm() {
             <input
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={e => { setEmail(e.target.value); setEmailStatus("idle"); }}
+              onBlur={() => checkEmail(email)}
               placeholder="seu@email.com"
-              className="w-full px-4 py-3 rounded-lg bg-[#0D1117] border border-gray-700 text-white text-sm focus:border-amber-500 focus:outline-none"
+              className={`w-full px-4 py-3 rounded-lg bg-[#0D1117] border text-white text-sm focus:outline-none ${
+                emailStatus === "exists" ? "border-red-500" :
+                emailStatus === "available" ? "border-green-500" :
+                "border-gray-700 focus:border-amber-500"
+              }`}
             />
+            {emailStatus === "checking" && (
+              <p className="text-gray-500 text-xs mt-1">Verificando...</p>
+            )}
+            {emailStatus === "exists" && (
+              <p className="text-red-400 text-xs mt-1">
+                E-mail ja cadastrado. <a href="/login" className="text-amber-500 hover:underline">Faca login aqui</a>
+              </p>
+            )}
+            {emailStatus === "exists_no_pass" && (
+              <p className="text-yellow-400 text-xs mt-1">
+                E-mail encontrado (sem senha). Preencha os dados para completar seu cadastro.
+              </p>
+            )}
+            {emailStatus === "available" && (
+              <p className="text-green-400 text-xs mt-1">E-mail disponivel</p>
+            )}
+          </div>
+
+          {/* Senha */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Senha</label>
+            <div className="relative">
+              <input
+                type={showSenha ? "text" : "password"}
+                value={senha}
+                onChange={e => validarSenha(e.target.value)}
+                placeholder="Crie sua senha"
+                className="w-full px-4 py-3 pr-16 rounded-lg bg-[#0D1117] border border-gray-700 text-white text-sm focus:border-amber-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSenha(!showSenha)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs hover:text-amber-500"
+              >
+                {showSenha ? "Ocultar" : "Mostrar"}
+              </button>
+            </div>
+            {senha.length > 0 && (
+              <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
+                <span className={senhaValida.tamanho ? "text-green-400" : "text-gray-500"}>
+                  {senhaValida.tamanho ? "\u2713" : "\u2717"} 8+ caracteres
+                </span>
+                <span className={senhaValida.maiuscula ? "text-green-400" : "text-gray-500"}>
+                  {senhaValida.maiuscula ? "\u2713" : "\u2717"} Letra maiuscula
+                </span>
+                <span className={senhaValida.minuscula ? "text-green-400" : "text-gray-500"}>
+                  {senhaValida.minuscula ? "\u2713" : "\u2717"} Letra minuscula
+                </span>
+                <span className={senhaValida.especial ? "text-green-400" : "text-gray-500"}>
+                  {senhaValida.especial ? "\u2713" : "\u2717"} Caractere especial
+                </span>
+              </div>
+            )}
           </div>
 
           {/* WhatsApp */}
