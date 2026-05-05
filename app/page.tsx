@@ -22,16 +22,16 @@ export default function Home() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
           <a
-            href="#planos"
+            href="/cadastro"
             className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-8 py-4 rounded-xl text-lg transition-colors text-center"
           >
-            Assinar agora
+            Cadastre-se gratis
           </a>
           <a
-            href="#como-funciona"
-            className="border border-gray-600 hover:border-gray-400 text-gray-300 font-semibold px-8 py-4 rounded-xl text-lg transition-colors text-center"
+            href="/planos"
+            className="border border-amber-500 hover:bg-amber-500/10 text-amber-500 font-semibold px-8 py-4 rounded-xl text-lg transition-colors text-center"
           >
-            Como funciona
+            Assinar agora
           </a>
         </div>
       </section>

@@ -3,13 +3,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function Header() {
   const [nome, setNome] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     const session = sessionStorage.getItem("macroforge_session");
@@ -35,11 +37,30 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  function handleMouseEnter() {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+    setMenuOpen(true);
+  }
+
+  function handleMouseLeave() {
+    closeTimer.current = setTimeout(() => {
+      setMenuOpen(false);
+    }, 400);
+  }
+
   function handleLogout() {
     sessionStorage.removeItem("macroforge_session");
     setNome(null);
     setMenuOpen(false);
     window.location.href = "/";
+  }
+
+  function navegar(path: string) {
+    setMenuOpen(false);
+    router.push(path);
   }
 
   return (
@@ -56,44 +77,47 @@ export default function Header() {
             <div
               className="relative"
               ref={menuRef}
-              onMouseEnter={() => setMenuOpen(true)}
-              onMouseLeave={() => setMenuOpen(false)}
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
             >
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="flex items-center gap-2 text-white text-sm hover:text-amber-500 transition-colors"
+                className="flex items-center gap-2 text-white text-sm hover:text-amber-500 transition-colors py-2"
               >
                 Ola, <span className="text-amber-500 font-bold">{nome}</span>
                 <span className={`text-gray-400 text-lg transition-transform ${menuOpen ? "rotate-180" : ""}`}>&#9662;</span>
               </button>
 
               {menuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-[#161B22] border border-gray-700 rounded-xl shadow-xl overflow-hidden">
-                  <Link
-                    href="/painel"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 px-4 py-3 text-sm text-white hover:bg-amber-500/10 transition-colors"
+                <div className="absolute right-0 top-full w-52 bg-[#161B22] border border-gray-700 rounded-xl shadow-xl overflow-hidden">
+                  <button
+                    onClick={() => navegar("/painel")}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-white hover:bg-amber-500/10 transition-colors text-left"
                   >
                     Meu painel
-                  </Link>
-                  <Link
-                    href="/painel#dados"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 px-4 py-3 text-sm text-gray-400 hover:bg-amber-500/10 hover:text-white transition-colors"
+                  </button>
+                  <button
+                    onClick={() => navegar("/painel#dados")}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-400 hover:bg-amber-500/10 hover:text-white transition-colors text-left"
                   >
                     Alterar dados
-                  </Link>
-                  <Link
-                    href="/painel#senha"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 px-4 py-3 text-sm text-gray-400 hover:bg-amber-500/10 hover:text-white transition-colors"
+                  </button>
+                  <button
+                    onClick={() => navegar("/painel#senha")}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-400 hover:bg-amber-500/10 hover:text-white transition-colors text-left"
                   >
                     Alterar senha
-                  </Link>
+                  </button>
+                  <button
+                    onClick={() => navegar("/painel#dispositivo")}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-400 hover:bg-amber-500/10 hover:text-white transition-colors text-left"
+                  >
+                    Reset de dispositivo
+                  </button>
                   <div className="border-t border-gray-700"></div>
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left"
                   >
                     Sair
                   </button>
@@ -109,7 +133,7 @@ export default function Header() {
                 Entrar
               </Link>
               <Link
-                href="/cadastro?plano=mensal"
+                href="/cadastro"
                 className="bg-amber-500 hover:bg-amber-600 text-black text-sm font-bold px-4 py-2 rounded-lg transition-colors"
               >
                 Criar conta

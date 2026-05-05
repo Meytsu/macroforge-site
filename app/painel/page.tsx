@@ -178,7 +178,7 @@ export default function PainelPage() {
           <div className="bg-[#161B22] border border-gray-800 rounded-xl p-8 text-center">
             <p className="text-gray-400 mb-4">Voce ainda nao tem nenhuma licenca.</p>
             <Link
-              href="/cadastro?plano=mensal"
+              href="/planos"
               className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-6 py-3 rounded-xl transition-colors"
             >
               Comprar agora
@@ -209,7 +209,7 @@ export default function PainelPage() {
         {licencas.length > 0 && (
           <div className="text-center">
             <Link
-              href="/cadastro?plano=mensal"
+              href="/planos"
               className="inline-block bg-amber-500 hover:bg-amber-600 text-black font-bold px-6 py-3 rounded-xl transition-colors"
             >
               Comprar nova licenca

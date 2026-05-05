@@ -94,8 +94,7 @@ export default function LoginPage() {
 
           <div className="text-right">
             <a
-              href="https://wa.me/5581973197753?text=Ola%2C%20esqueci%20minha%20senha%20do%20MacroForge.%20Meu%20e-mail%20e%3A%20"
-              target="_blank"
+              href="/recuperar"
               className="text-amber-500 text-xs hover:underline"
             >
               Esqueceu a senha?

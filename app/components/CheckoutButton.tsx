@@ -12,7 +12,7 @@ export default function CheckoutButton({
   const router = useRouter();
 
   function handleClick() {
-    router.push(`/cadastro?plano=${plano}`);
+    router.push(`/planos`);
   }
 
   return (
