@@ -129,7 +129,20 @@ export default function PainelPage() {
             <h2 className="text-lg font-bold mb-4">Licencas ativas</h2>
             <div className="space-y-4">
               {ativas.map(lic => (
-                <LicencaCard key={lic.chave} licenca={lic} />
+                <LicencaCard key={lic.chave} licenca={lic} email={cliente.email} onReset={() => {
+                  // Recarrega dados do servidor
+                  fetch("/api/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: cliente.email, senha: "_skip_" }),
+                  });
+                  // Atualiza localmente
+                  const updated = { ...lic, device_id: null };
+                  const newLicencas = licencas.map(l => l.chave === lic.chave ? updated : l);
+                  const newSession = { ...session, licencas: newLicencas };
+                  setSession(newSession);
+                  sessionStorage.setItem("macroforge_session", JSON.stringify(newSession));
+                }} />
               ))}
             </div>
           </div>
@@ -141,7 +154,20 @@ export default function PainelPage() {
             <h2 className="text-lg font-bold mb-4 text-gray-400">Historico</h2>
             <div className="space-y-4">
               {outras.map(lic => (
-                <LicencaCard key={lic.chave} licenca={lic} />
+                <LicencaCard key={lic.chave} licenca={lic} email={cliente.email} onReset={() => {
+                  // Recarrega dados do servidor
+                  fetch("/api/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: cliente.email, senha: "_skip_" }),
+                  });
+                  // Atualiza localmente
+                  const updated = { ...lic, device_id: null };
+                  const newLicencas = licencas.map(l => l.chave === lic.chave ? updated : l);
+                  const newSession = { ...session, licencas: newLicencas };
+                  setSession(newSession);
+                  sessionStorage.setItem("macroforge_session", JSON.stringify(newSession));
+                }} />
               ))}
             </div>
           </div>
@@ -246,9 +272,45 @@ export default function PainelPage() {
   );
 }
 
-function LicencaCard({ licenca }: { licenca: Licenca }) {
+function LicencaCard({ licenca, email, onReset }: { licenca: Licenca; email: string; onReset: () => void }) {
   const [mostrarChave, setMostrarChave] = useState(false);
+  const [resetando, setResetando] = useState(false);
+  const [pedindoSenha, setPedindoSenha] = useState(false);
+  const [senhaReset, setSenhaReset] = useState("");
+  const [resetMsg, setResetMsg] = useState("");
   const dias = diasRestantes(licenca.data_expiracao);
+
+  async function handleReset() {
+    if (!pedindoSenha) {
+      setPedindoSenha(true);
+      return;
+    }
+    if (!senhaReset) {
+      setResetMsg("Digite sua senha pra confirmar");
+      return;
+    }
+    setResetando(true);
+    setResetMsg("");
+    try {
+      const res = await fetch("/api/reset-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, senha: senhaReset, chave: licenca.chave }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setResetMsg("Dispositivo liberado!");
+        setPedindoSenha(false);
+        setSenhaReset("");
+        onReset();
+      } else {
+        setResetMsg(data.error || "Erro ao resetar");
+      }
+    } catch {
+      setResetMsg("Erro de conexao");
+    }
+    setResetando(false);
+  }
 
   return (
     <div className="bg-[#161B22] border border-gray-800 rounded-xl p-5">
@@ -303,10 +365,35 @@ function LicencaCard({ licenca }: { licenca: Licenca }) {
       {/* Dispositivo */}
       <div className="mt-3 pt-3 border-t border-gray-800">
         {licenca.device_id ? (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-            <span className="text-gray-400">Dispositivo ativo:</span>
-            <span className="font-mono text-white bg-[#0D1117] px-2 py-0.5 rounded">{licenca.device_id}</span>
+          <div className="space-y-2">
+            <DeviceRow deviceId={licenca.device_id!} chave={licenca.chave} onReset={handleReset} />
+            {pedindoSenha && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="password"
+                  value={senhaReset}
+                  onChange={e => setSenhaReset(e.target.value)}
+                  placeholder="Sua senha pra confirmar"
+                  className="flex-1 px-3 py-1.5 rounded bg-[#0D1117] border border-gray-700 text-white text-xs focus:border-amber-500 focus:outline-none"
+                />
+                <button
+                  onClick={handleReset}
+                  disabled={resetando}
+                  className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold px-3 py-1.5 rounded transition-colors"
+                >
+                  {resetando ? "..." : "Confirmar"}
+                </button>
+                <button
+                  onClick={() => { setPedindoSenha(false); setSenhaReset(""); setResetMsg(""); }}
+                  className="text-gray-500 text-xs hover:text-white"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+            {resetMsg && (
+              <p className={`text-xs ${resetMsg.includes("liberado") ? "text-green-400" : "text-red-400"}`}>{resetMsg}</p>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2 text-xs">
@@ -515,6 +602,59 @@ function AlterarSenhaButton({ email }: { email: string }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DeviceRow({ deviceId, chave, onReset }: { deviceId: string; chave: string; onReset: () => void }) {
+  const storageKey = `device_name_${chave}`;
+  const [nomeDevice, setNomeDevice] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(storageKey) || "";
+    }
+    return "";
+  });
+  const [editando, setEditando] = useState(false);
+  const [novoNome, setNovoNome] = useState(nomeDevice);
+
+  function salvarNome() {
+    setNomeDevice(novoNome);
+    localStorage.setItem(storageKey, novoNome);
+    setEditando(false);
+  }
+
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2 text-xs flex-wrap">
+        <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
+        <span className="text-gray-400">Dispositivo:</span>
+        {nomeDevice ? (
+          <span className="text-white font-medium">{nomeDevice}</span>
+        ) : (
+          <span className="font-mono text-white bg-[#0D1117] px-2 py-0.5 rounded">{deviceId}</span>
+        )}
+        {editando ? (
+          <span className="flex items-center gap-1">
+            <input
+              type="text"
+              value={novoNome}
+              onChange={e => setNovoNome(e.target.value)}
+              placeholder="Ex: Meu Celular"
+              className="px-2 py-0.5 rounded bg-[#0D1117] border border-gray-700 text-white text-xs w-28 focus:border-amber-500 focus:outline-none"
+              autoFocus
+            />
+            <button onClick={salvarNome} className="text-green-400 text-xs hover:underline">OK</button>
+            <button onClick={() => setEditando(false)} className="text-gray-500 text-xs hover:underline">X</button>
+          </span>
+        ) : (
+          <button onClick={() => { setEditando(true); setNovoNome(nomeDevice); }} className="text-gray-500 text-xs hover:text-amber-500">
+            {nomeDevice ? "editar" : "nomear"}
+          </button>
+        )}
+      </div>
+      <button onClick={onReset} className="text-amber-500 text-xs hover:underline flex-shrink-0">
+        Trocar dispositivo
+      </button>
     </div>
   );
 }
