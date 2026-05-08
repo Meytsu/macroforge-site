@@ -12,6 +12,51 @@ const headers = {
   Prefer: "return=representation",
 };
 
+const MAX_PEDIDOS = 3;
+const BLOQUEIO_MINUTOS_RECUP = 30;
+
+async function verificarBloqueioRecup(email: string): Promise<string | null> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/tentativas_login?email=eq.${encodeURIComponent(email)}&tipo=eq.recuperacao&order=ultima_tentativa.desc&limit=1`,
+    { headers }
+  );
+  const dados = await res.json();
+  if (dados.length === 0) return null;
+
+  const reg = dados[0];
+  if (reg.bloqueado_ate && new Date() < new Date(reg.bloqueado_ate)) {
+    const min = Math.ceil((new Date(reg.bloqueado_ate).getTime() - Date.now()) / 60000);
+    return `Muitos pedidos. Aguarde ${min} minuto(s).`;
+  }
+  // Expirou — reseta
+  if (reg.bloqueado_ate) {
+    await fetch(`${SUPABASE_URL}/rest/v1/tentativas_login?id=eq.${reg.id}`,
+      { method: "PATCH", headers, body: JSON.stringify({ tentativas: 0, bloqueado_ate: null }) });
+  }
+  return null;
+}
+
+async function registrarPedidoRecup(email: string) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/tentativas_login?email=eq.${encodeURIComponent(email)}&tipo=eq.recuperacao&order=ultima_tentativa.desc&limit=1`,
+    { headers }
+  );
+  const dados = await res.json();
+
+  if (dados.length > 0) {
+    const novas = dados[0].tentativas + 1;
+    const bloqueio = novas >= MAX_PEDIDOS
+      ? new Date(Date.now() + BLOQUEIO_MINUTOS_RECUP * 60 * 1000).toISOString() : null;
+    await fetch(`${SUPABASE_URL}/rest/v1/tentativas_login?id=eq.${dados[0].id}`,
+      { method: "PATCH", headers, body: JSON.stringify({
+          tentativas: novas, ultima_tentativa: new Date().toISOString(), bloqueado_ate: bloqueio }) });
+  } else {
+    await fetch(`${SUPABASE_URL}/rest/v1/tentativas_login`,
+      { method: "POST", headers, body: JSON.stringify({
+          email, tipo: "recuperacao", tentativas: 1, ultima_tentativa: new Date().toISOString() }) });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { email } = await req.json();
@@ -19,6 +64,15 @@ export async function POST(req: NextRequest) {
     if (!email || !email.includes("@")) {
       return NextResponse.json({ error: "E-mail invalido" }, { status: 400 });
     }
+
+    // Verifica bloqueio
+    const bloqueio = await verificarBloqueioRecup(email);
+    if (bloqueio) {
+      return NextResponse.json({ error: bloqueio }, { status: 429 });
+    }
+
+    // Registra tentativa
+    await registrarPedidoRecup(email);
 
     // Verifica se o cliente existe
     const clienteRes = await fetch(
