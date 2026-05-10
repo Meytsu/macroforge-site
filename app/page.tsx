@@ -174,6 +174,11 @@ export default function Home() {
       <footer className="px-6 py-8 text-center text-gray-500 text-sm border-t border-gray-800">
         <p>MacroForge &copy; 2026 — Todos os direitos reservados</p>
         <p className="mt-2">
+          <a href="/privacidade" className="text-gray-500 hover:text-amber-500 text-xs mx-2">Politica de Privacidade</a>
+          <span className="text-gray-700">|</span>
+          <a href="/termos" className="text-gray-500 hover:text-amber-500 text-xs mx-2">Termos de Uso</a>
+        </p>
+        <p className="mt-2">
           Suporte:{" "}
           <a
             href="https://wa.me/5581973197753"
