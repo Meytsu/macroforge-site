@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     // Envia email
     await resend.emails.send({
-      from: "MacroForge <onboarding@resend.dev>",
+      from: "MacroForge <noreply@macroforge.com.br>",
       to: email,
       subject: "Codigo de recuperacao — MacroForge",
       html: `

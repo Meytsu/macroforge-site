@@ -56,7 +56,7 @@ async function enviarEmailChave(email: string, chave: string, plano: string, exp
 
   try {
     await resend.emails.send({
-      from: "MacroForge <onboarding@resend.dev>",
+      from: "MacroForge <noreply@macroforge.com.br>",
       to: email,
       subject: "Sua chave MacroForge esta pronta!",
       html: `
@@ -93,7 +93,7 @@ async function enviarEmailChave(email: string, chave: string, plano: string, exp
           <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
             <p style="color: #D4A017; font-weight: bold; margin: 0 0 8px 0;">Como ativar:</p>
             <ol style="color: #8B949E; font-size: 13px; padding-left: 20px; margin: 0;">
-              <li style="margin-bottom: 4px;">Baixe o MacroForge no seu painel: <a href="https://macroforge-app.vercel.app/login" style="color: #D4A017;">macroforge-app.vercel.app</a></li>
+              <li style="margin-bottom: 4px;">Baixe o MacroForge no seu painel: <a href="https://macroforge.com.br/login" style="color: #D4A017;">macroforge.com.br</a></li>
               <li style="margin-bottom: 4px;">Instale o APK no celular ou BlueStacks</li>
               <li style="margin-bottom: 4px;">Abra o app e digite a chave acima</li>
               <li>Pronto! Crie seus macros e automatize</li>
