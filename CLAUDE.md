@@ -2,9 +2,15 @@
 
 Este arquivo é o **CLAUDE.md específico do site Next.js**. Cobre só particularidades deste subcomponente.
 
-**Contexto geral do projeto** (perfil do dev, regras de IA, workflow trabalho↔casa, convenções gerais) → ver o `CLAUDE.md` raiz do repo `macroforge`:
-- `../CLAUDE.md` (se você estiver navegando o repo `macroforge` privado)
-- Ou consultar `https://github.com/Meytsu/macroforge` (privado, exige acesso)
+**Hierarquia de CLAUDE.md** (estrutura do projeto inteiro, vista do repo privado `macroforge`):
+
+```
+macroforge/CLAUDE.md       ← overview + regras gerais + workflow trabalho↔casa
+macroforge/app/CLAUDE.md   ← Android nativo Java
+macroforge/site/CLAUDE.md  ← este (Next.js)  — commit no repo macroforge-site público
+```
+
+**Contexto geral** (perfil do dev, regras de IA, workflow, convenções de docs) → ver `../CLAUDE.md` (raiz do repo `macroforge` privado).
 
 **Documentação do projeto** (`decisions.md`, `bugs.md`, `issues.md`, `key_facts.md`) → centralizada em `macroforge/docs/project_notes/` no repo privado. **Não duplicar aqui.**
 
