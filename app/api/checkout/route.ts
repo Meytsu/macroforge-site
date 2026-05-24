@@ -2,10 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Preference } from "mercadopago";
 
 const PLANOS: Record<string, { title: string; price: number; days: number }> = {
-  mensal: { title: "MacroForge — Mensal", price: 14.9, days: 30 },
-  trimestral: { title: "MacroForge — Trimestral", price: 34.9, days: 90 },
-  semestral: { title: "MacroForge — Semestral", price: 59.9, days: 180 },
+  mensal: { title: "MacroForge — Mensal", price: 9.9, days: 30 },
+  trimestral: { title: "MacroForge — Trimestral", price: 24.9, days: 90 },
+  semestral: { title: "MacroForge — Semestral", price: 44.9, days: 180 },
+  anual: { title: "MacroForge — Anual", price: 77.9, days: 365 },
 };
+
+function getDesconto(qty: number): number {
+  if (qty >= 20) return 0.3;
+  if (qty >= 10) return 0.25;
+  if (qty >= 5) return 0.15;
+  if (qty >= 3) return 0.1;
+  return 0;
+}
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
@@ -19,6 +28,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { plano, email, nome, whatsapp, pais, estado, cidade, codigo_pais } = body;
+    const quantidade = Math.max(1, Math.min(999, parseInt(body.quantidade, 10) || 1));
 
     const plan = PLANOS[plano];
     if (!plan) {
@@ -29,6 +39,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "E-mail invalido" }, { status: 400 });
     }
 
+    // Calcula preco com desconto de volume
+    const desconto = getDesconto(quantidade);
+    const precoUnitario = Math.round(plan.price * (1 - desconto) * 100) / 100;
+    const total = Math.round(precoUnitario * quantidade * 100) / 100;
+
     // Salva/atualiza o cliente no Supabase antes do pagamento
     if (nome && SUPABASE_URL && SUPABASE_KEY) {
       const headers = {
@@ -38,7 +53,6 @@ export async function POST(req: NextRequest) {
         Prefer: "return=representation",
       };
 
-      // Verifica se o cliente já existe
       const checkRes = await fetch(
         `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}`,
         { headers }
@@ -56,13 +70,11 @@ export async function POST(req: NextRequest) {
       };
 
       if (existing.length > 0) {
-        // Atualiza dados do cliente existente
         await fetch(
           `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}`,
           { method: "PATCH", headers, body: JSON.stringify(clienteData) }
         );
       } else {
-        // Cria cliente novo
         await fetch(
           `${SUPABASE_URL}/rest/v1/clientes`,
           { method: "POST", headers, body: JSON.stringify(clienteData) }
@@ -75,14 +87,16 @@ export async function POST(req: NextRequest) {
     const client = new MercadoPagoConfig({ accessToken });
     const preference = new Preference(client);
 
+    const titleSuffix = quantidade > 1 ? ` (${quantidade} chaves)` : "";
+
     const result = await preference.create({
       body: {
         items: [
           {
-            id: plano,
-            title: plan.title,
+            id: `${plano}_x${quantidade}`,
+            title: `${plan.title}${titleSuffix}`,
             quantity: 1,
-            unit_price: plan.price,
+            unit_price: total,
             currency_id: "BRL",
           },
         ],
@@ -105,6 +119,7 @@ export async function POST(req: NextRequest) {
           plano: plano,
           email: email,
           nome: nome || "",
+          quantidade: quantidade,
         },
       },
     });

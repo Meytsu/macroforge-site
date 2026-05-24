@@ -4,6 +4,41 @@ import bcrypt from "bcryptjs";
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 
+// Dominios de email temporario/descartavel — bloquear cadastro
+const DOMINIOS_BLOQUEADOS = new Set([
+  "tempmail.com", "temp-mail.org", "tempmail.net", "temp-mail.io",
+  "guerrillamail.com", "guerrillamail.net", "guerrillamail.org", "guerrilla.ml",
+  "yopmail.com", "yopmail.fr", "yopmail.net",
+  "mailinator.com", "mailinator2.com",
+  "throwaway.email", "throwawaymail.com",
+  "sharklasers.com", "guerrillamailblock.com", "grr.la", "dispostable.com",
+  "maildrop.cc", "mailnesia.com", "mailcatch.com",
+  "10minutemail.com", "10minutemail.net", "10minute.email",
+  "trashmail.com", "trashmail.net", "trashmail.me",
+  "getnada.com", "nada.email", "nada.ltd",
+  "mohmal.com", "emailondeck.com", "tempr.email",
+  "fakeinbox.com", "fakemail.net",
+  "crazymailing.com", "tmail.ws",
+  "burnermail.io", "inboxkitten.com",
+  "mailsac.com", "harakirimail.com",
+  "tempail.com", "tmpmail.net", "tmpmail.org",
+  "disposableemailaddresses.emailmiser.com",
+  "mytemp.email", "emailfake.com",
+  "mintemail.com", "flitmail.com",
+  "getairmail.com", "filzmail.com",
+  "mailnull.com", "spamfree24.org",
+  "bugmenot.com", "discard.email",
+  "discardmail.com", "discardmail.de",
+  "mailexpire.com", "safetymail.info",
+  "squizzy.de", "trashinbox.com",
+]);
+
+function isEmailDescartavel(email: string): boolean {
+  const dominio = email.split("@")[1]?.toLowerCase();
+  if (!dominio) return false;
+  return DOMINIOS_BLOQUEADOS.has(dominio);
+}
+
 const headers = {
   apikey: SUPABASE_KEY,
   Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -26,6 +61,14 @@ export async function POST(req: NextRequest) {
 
     if (!email.includes("@")) {
       return NextResponse.json({ error: "E-mail invalido" }, { status: 400 });
+    }
+
+    // Bloqueia emails temporarios/descartaveis
+    if (isEmailDescartavel(email)) {
+      return NextResponse.json(
+        { error: "E-mails temporarios nao sao permitidos. Use seu e-mail real." },
+        { status: 400 }
+      );
     }
 
     // Validação da senha

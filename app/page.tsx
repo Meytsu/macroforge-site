@@ -87,13 +87,19 @@ export default function Home() {
       {/* PLANOS */}
       <section id="planos" className="px-6 py-16 max-w-5xl mx-auto">
         <h2 className="text-3xl font-bold text-center mb-4">Planos</h2>
-        <p className="text-gray-400 text-center mb-12">
+        <p className="text-gray-400 text-center mb-4">
           Cancele quando quiser. Sem fidelidade.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2 mb-10 text-center max-w-md mx-auto">
+          <p className="text-amber-400 text-sm font-semibold">
+            Promocao de lancamento — oferta por tempo limitado
+          </p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           <PlanCard
             name="Mensal"
-            price="14,90"
+            priceOld="14,90"
+            price="9,90"
             period="/mes"
             plano="mensal"
             features={[
@@ -106,7 +112,9 @@ export default function Home() {
           />
           <PlanCard
             name="Trimestral"
-            price="34,90"
+            priceOld="37,90"
+            price="24,90"
+            perMonth="8,30"
             period="/3 meses"
             plano="trimestral"
             features={[
@@ -114,13 +122,15 @@ export default function Home() {
               "1 dispositivo",
               "Suporte via WhatsApp",
               "Atualizacoes incluidas",
-              "Economia de 22%",
+              "Economia de 15%",
             ]}
             highlight={true}
           />
           <PlanCard
             name="Semestral"
-            price="59,90"
+            priceOld="66,90"
+            price="44,90"
+            perMonth="7,48"
             period="/6 meses"
             plano="semestral"
             features={[
@@ -128,7 +138,25 @@ export default function Home() {
               "1 dispositivo",
               "Suporte prioritario",
               "Atualizacoes incluidas",
-              "Economia de 33%",
+              "Economia de 25%",
+            ]}
+            highlight={false}
+          />
+          <PlanCard
+            name="Anual"
+            priceOld="116,90"
+            price="77,90"
+            perMonth="6,49"
+            period="/ano"
+            plano="anual"
+            badge="Melhor valor"
+            features={[
+              "Todas as funcionalidades",
+              "1 dispositivo",
+              "Suporte prioritario",
+              "Atualizacoes incluidas",
+              "Economia de 35%",
+              "4 meses gratis",
             ]}
             highlight={false}
           />
@@ -217,29 +245,45 @@ function Step({ number, title, description }: { number: string; title: string; d
 }
 
 function PlanCard({
-  name, price, period, features, highlight, plano,
+  name, price, priceOld, perMonth, period, features, highlight, plano, badge,
 }: {
-  name: string; price: string; period: string; features: string[]; highlight: boolean; plano: string;
+  name: string; price: string; priceOld?: string; perMonth?: string; period: string; features: string[]; highlight: boolean; plano: string; badge?: string;
 }) {
   return (
     <div
-      className={`rounded-xl p-6 border ${
+      className={`relative rounded-xl p-6 border ${
         highlight
           ? "border-amber-500 bg-[#161B22] ring-2 ring-amber-500/30"
-          : "border-gray-800 bg-[#161B22]"
+          : badge
+            ? "border-green-500/50 bg-[#161B22] ring-2 ring-green-500/20"
+            : "border-gray-800 bg-[#161B22]"
       }`}
     >
       {highlight && (
-        <div className="text-amber-500 text-xs font-bold uppercase tracking-wider mb-4">
+        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
           Mais popular
         </div>
       )}
+      {badge && (
+        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-green-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+          {badge}
+        </div>
+      )}
       <h3 className="text-xl font-bold mb-2">{name}</h3>
-      <div className="flex items-baseline gap-1 mb-6">
-        <span className="text-sm text-gray-400">R$</span>
-        <span className="text-4xl font-bold">{price}</span>
+      {priceOld && (
+        <div className="text-gray-500 text-sm line-through mb-1">
+          R$ {priceOld}
+        </div>
+      )}
+      <div className="flex items-baseline gap-1 mb-1">
+        <span className="text-sm text-amber-400">R$</span>
+        <span className="text-4xl font-bold text-amber-500">{price}</span>
         <span className="text-gray-400 text-sm">{period}</span>
       </div>
+      {perMonth && (
+        <p className="text-gray-400 text-xs mb-5">R$ {perMonth}/mes</p>
+      )}
+      {!perMonth && <div className="mb-5" />}
       <ul className="space-y-3 mb-8">
         {features.map((f, i) => (
           <li key={i} className="flex items-center gap-2 text-sm text-gray-300">
