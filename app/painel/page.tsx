@@ -70,8 +70,24 @@ export default function PainelPage() {
       router.push("/login");
       return;
     }
-    setSession(JSON.parse(stored));
+    const cached: SessionData = JSON.parse(stored);
+    setSession(cached);
     setLoading(false);
+
+    // Rebusca do servidor ao abrir/atualizar — o sessionStorage e um retrato
+    // do momento do login e fica velho (ex.: trial ativado no app DEPOIS do login
+    // nao aparecia ate deslogar/logar). GET /api/painel devolve cliente + licencas atuais.
+    const email = cached?.cliente?.email;
+    if (!email) return;
+    fetch(`/api/painel?email=${encodeURIComponent(email)}`)
+      .then(res => (res.ok ? res.json() : null))
+      .then((fresh: SessionData | null) => {
+        if (fresh && fresh.cliente && Array.isArray(fresh.licencas)) {
+          setSession(fresh);
+          sessionStorage.setItem("macroforge_session", JSON.stringify(fresh));
+        }
+      })
+      .catch(() => { /* sem rede: mantem o que tinha no cache */ });
   }, [router]);
 
   function handleLogout() {
