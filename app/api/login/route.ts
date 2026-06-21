@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { emitirCracha } from "@/app/api/_lib/auth";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
@@ -162,7 +163,17 @@ export async function POST(req: NextRequest) {
     );
     const licencas = await licRes.json();
 
-    return NextResponse.json({ cliente: clienteSeguro, licencas });
+    // MF-103 Bloqueador 1: emite o crachá (JWT, 30 dias) pro app provar identidade depois.
+    // Campo NOVO e opcional — o app antigo ignora; só o app novo usa. Não quebra ninguém.
+    let token: string | null = null;
+    try {
+      token = await emitirCracha(cliente.id, cliente.email);
+    } catch (e) {
+      // Sem segredo configurado: loga e segue sem token (login continua funcionando).
+      console.error("Falha ao emitir crachá (AUTH_JWT_SECRET?):", e);
+    }
+
+    return NextResponse.json({ cliente: clienteSeguro, licencas, token });
   } catch (error) {
     console.error("Erro no login:", error);
     return NextResponse.json({ error: "Erro no servidor" }, { status: 500 });
