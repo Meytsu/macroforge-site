@@ -11,23 +11,22 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 
+// Alinhado ao app/checkout/página (MF-103, 2026-06-20). Trimestral removido.
+// (Chaves antigas com plano='trimestral' seguem validas; o mapa só serve pra novas compras.)
 const PLANO_DIAS: Record<string, number> = {
   mensal: 30,
-  trimestral: 90,
   semestral: 180,
   anual: 365,
 };
 
 const PLANO_VALOR: Record<string, number> = {
   mensal: 9.9,
-  trimestral: 24.9,
-  semestral: 44.9,
-  anual: 77.9,
+  semestral: 47.9,
+  anual: 79.9,
 };
 
 const PLANO_NOME: Record<string, string> = {
   mensal: "Mensal (30 dias)",
-  trimestral: "Trimestral (90 dias)",
   semestral: "Semestral (180 dias)",
   anual: "Anual (365 dias)",
 };

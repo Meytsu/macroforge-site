@@ -4,49 +4,46 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
+// Planos alinhados ao app (MF-103): sem trimestral; precoLancamento = preco fixo de 1 chave
+// (igual ao app), arredondado a ,90. POPULAR no Semestral; MELHOR VALOR no Anual.
+// precoRegular = preco "de" (riscado) = equivalente mensal avulso (9,90 x meses), pra mostrar
+// a economia da assinatura longa. economia = desconto da assinatura (floor, nunca infla).
 const PLANOS = [
   {
     id: "mensal",
     nome: "Mensal",
-    precoRegular: 14.9,
+    precoRegular: 9.9,
     precoLancamento: 9.9,
     periodo: "/mes",
     meses: 1,
     destaque: false,
   },
   {
-    id: "trimestral",
-    nome: "Trimestral",
-    precoRegular: 37.9,
-    precoLancamento: 24.9,
-    periodo: "/3 meses",
-    meses: 3,
-    destaque: true,
-    economia: "15%",
-  },
-  {
     id: "semestral",
     nome: "Semestral",
-    precoRegular: 66.9,
-    precoLancamento: 44.9,
+    precoRegular: 59.4, // 9,90 x 6 (mensal avulso)
+    precoLancamento: 47.9,
     periodo: "/6 meses",
     meses: 6,
-    destaque: false,
-    economia: "25%",
+    destaque: true,
+    economia: "19%",
   },
   {
     id: "anual",
     nome: "Anual",
-    precoRegular: 116.9,
-    precoLancamento: 77.9,
+    precoRegular: 118.8, // 9,90 x 12 (mensal avulso)
+    precoLancamento: 79.9,
     periodo: "/ano",
     meses: 12,
     destaque: false,
-    economia: "35%",
+    economia: "32%",
     melhorValor: true,
     bonus: "4 meses gratis",
   },
 ];
+
+// Teto de quantidade no site (app usa fixo 1/3/5; site permite ate este maximo).
+const MAX_CHAVES = 25;
 
 function getDesconto(qty: number): number {
   if (qty >= 20) return 0.3;
@@ -113,7 +110,7 @@ export default function PlanosPage() {
   function handleCustomQty(value: string) {
     setCustomQty(value);
     const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 1 && num <= 999) {
+    if (!isNaN(num) && num >= 1 && num <= MAX_CHAVES) {
       setQuantidade(num);
     } else if (value === "") {
       setQuantidade(1);
@@ -266,7 +263,7 @@ export default function PlanosPage() {
               <input
                 type="number"
                 min={1}
-                max={999}
+                max={MAX_CHAVES}
                 value={customQty}
                 onChange={(e) => handleCustomQty(e.target.value)}
                 placeholder="Qtd"

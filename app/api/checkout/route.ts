@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Preference } from "mercadopago";
 
+// Preços alinhados ao app e à página /planos (MF-103, 2026-06-20). Trimestral removido.
+// price = preço de 1 chave (base); o desconto de volume é aplicado por getDesconto().
 const PLANOS: Record<string, { title: string; price: number; days: number }> = {
   mensal: { title: "MacroForge — Mensal", price: 9.9, days: 30 },
-  trimestral: { title: "MacroForge — Trimestral", price: 24.9, days: 90 },
-  semestral: { title: "MacroForge — Semestral", price: 44.9, days: 180 },
-  anual: { title: "MacroForge — Anual", price: 77.9, days: 365 },
+  semestral: { title: "MacroForge — Semestral", price: 47.9, days: 180 },
+  anual: { title: "MacroForge — Anual", price: 79.9, days: 365 },
 };
 
 function getDesconto(qty: number): number {
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { plano, email, nome, whatsapp, pais, estado, cidade, codigo_pais } = body;
-    const quantidade = Math.max(1, Math.min(999, parseInt(body.quantidade, 10) || 1));
+    const quantidade = Math.max(1, Math.min(25, parseInt(body.quantidade, 10) || 1));
 
     const plan = PLANOS[plano];
     if (!plan) {
