@@ -8,8 +8,8 @@ import { NextResponse } from "next/server";
 // da versão nova e (se mudou) o apkUrl. O versionCode tem que casar com o do
 // app/build.gradle.kts. apkUrl = release pública no repo do site (GitHub Releases).
 const APP_VERSION = {
-  versionCode: 1,           // <-- bater com app/app/build.gradle.kts (defaultConfig.versionCode)
-  versionName: "1.0.0",
+  versionCode: 2,           // [TESTE TEMPORÁRIO MF-114] simula versão nova pra ver o card de update; REVERTER pra 1
+  versionName: "1.0.1",
   apkUrl:
     "https://github.com/Meytsu/macroforge-site/releases/download/v1.0.0/MacroForge_v1.0.0.apk",
   // Mudanças da versão atual (mostradas na tela Sobre / no aviso de atualização).
