@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clienteIdDoHeader } from "@/app/api/_lib/auth";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
@@ -10,27 +11,34 @@ const headers = {
 };
 
 /**
- * GET /api/painel?email=user@email.com
+ * GET /api/painel
  *
  * Retorna dados do cliente + todas as licencas.
- * Usado pelo app Android (ChavesFragment) pra listar chaves.
+ *
+ * SEGURANCA (MF-103 Bloqueador 1): o cliente e derivado do CRACHA assinado
+ * (header `Authorization: Bearer <token>`), NUNCA de um parametro de e-mail.
+ * Antes a rota aceitava `?email=` sem autenticacao e devolvia nome/telefone/
+ * cidade/licencas de QUALQUER cliente — qualquer um que soubesse o e-mail lia
+ * os dados. Agora, sem cracha valido -> 401, e cada um so ve os proprios dados.
+ *
+ * Usado pelo app Android (ChavesFragment) e pelo painel web — ambos enviam o
+ * cracha obtido no login.
  */
 export async function GET(req: NextRequest) {
   try {
-    const email = req.nextUrl.searchParams.get("email");
-
-    if (!email || !email.includes("@")) {
-      return NextResponse.json({ error: "E-mail invalido" }, { status: 400 });
+    const clienteId = await clienteIdDoHeader(req.headers.get("authorization"));
+    if (!clienteId) {
+      return NextResponse.json({ error: "Nao autorizado" }, { status: 401 });
     }
 
-    // Busca cliente
+    // Busca cliente pelo ID DO CRACHA (verificado), não por e-mail do parâmetro.
     const clienteRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}&select=id,nome,email,whatsapp,pais,estado,cidade`,
+      `${SUPABASE_URL}/rest/v1/clientes?id=eq.${encodeURIComponent(clienteId)}&select=id,nome,email,whatsapp,pais,estado,cidade`,
       { headers }
     );
     const clientes = await clienteRes.json();
 
-    if (clientes.length === 0) {
+    if (!Array.isArray(clientes) || clientes.length === 0) {
       return NextResponse.json({ error: "Cliente nao encontrado" }, { status: 404 });
     }
 

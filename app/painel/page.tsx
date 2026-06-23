@@ -28,6 +28,7 @@ interface Cliente {
 interface SessionData {
   cliente: Cliente;
   licencas: Licenca[];
+  token?: string; // crachá (JWT) emitido no login — enviado nas chamadas autenticadas
 }
 
 function diasRestantes(dataExp: string): number {
@@ -77,14 +78,18 @@ export default function PainelPage() {
     // Rebusca do servidor ao abrir/atualizar — o sessionStorage e um retrato
     // do momento do login e fica velho (ex.: trial ativado no app DEPOIS do login
     // nao aparecia ate deslogar/logar). GET /api/painel devolve cliente + licencas atuais.
-    const email = cached?.cliente?.email;
-    if (!email) return;
-    fetch(`/api/painel?email=${encodeURIComponent(email)}`)
+    // /api/painel agora exige o crachá (Authorization: Bearer). Sem token (sessão
+    // antiga), pula o refresh e mantém o retrato do login.
+    const token = cached?.token;
+    if (!token) return;
+    fetch(`/api/painel`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => (res.ok ? res.json() : null))
-      .then((fresh: SessionData | null) => {
+      .then((fresh: { cliente: Cliente; licencas: Licenca[] } | null) => {
         if (fresh && fresh.cliente && Array.isArray(fresh.licencas)) {
-          setSession(fresh);
-          sessionStorage.setItem("macroforge_session", JSON.stringify(fresh));
+          // o /api/painel não devolve token — preserva o crachá ao regravar a sessão.
+          const merged: SessionData = { ...fresh, token };
+          setSession(merged);
+          sessionStorage.setItem("macroforge_session", JSON.stringify(merged));
         }
       })
       .catch(() => { /* sem rede: mantem o que tinha no cache */ });
@@ -438,10 +443,16 @@ function EditarDadosButton({ cliente, onUpdate }: { cliente: Cliente; onUpdate: 
     setMsg("");
 
     try {
+      // /api/atualizar-dados agora exige o crachá; o cliente é derivado dele no servidor.
+      const stored = sessionStorage.getItem("macroforge_session");
+      const token = stored ? (JSON.parse(stored).token as string | undefined) : undefined;
       const res = await fetch("/api/atualizar-dados", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cliente.email, nome, whatsapp, pais, estado, cidade }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ nome, whatsapp, pais, estado, cidade }),
       });
       const data = await res.json();
       if (data.ok) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clienteIdDoHeader } from "@/app/api/_lib/auth";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
@@ -10,20 +11,30 @@ const headers = {
   Prefer: "return=representation",
 };
 
+/**
+ * POST /api/atualizar-dados
+ *
+ * SEGURANCA (MF-103 Bloqueador 1): protegido por CRACHA (Authorization: Bearer).
+ * O cliente alterado é derivado do crachá assinado, NUNCA do e-mail do corpo.
+ * Antes era sem autenticação — qualquer um podia sobrescrever o perfil (nome/
+ * whatsapp/cidade) de outro cliente só sabendo o e-mail dele.
+ */
 export async function POST(req: NextRequest) {
   try {
-    const { email, nome, whatsapp, pais, estado, cidade, codigo_pais } = await req.json();
-
-    if (!email) {
-      return NextResponse.json({ error: "E-mail obrigatorio" }, { status: 400 });
+    const clienteId = await clienteIdDoHeader(req.headers.get("authorization"));
+    if (!clienteId) {
+      return NextResponse.json({ error: "Nao autorizado" }, { status: 401 });
     }
+
+    const { nome, whatsapp, pais, estado, cidade, codigo_pais } = await req.json();
 
     if (!nome || !nome.trim()) {
       return NextResponse.json({ error: "Nome obrigatorio" }, { status: 400 });
     }
 
+    // PATCH pelo ID DO CRACHA (verificado), não por e-mail do corpo.
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}`,
+      `${SUPABASE_URL}/rest/v1/clientes?id=eq.${encodeURIComponent(clienteId)}`,
       {
         method: "PATCH",
         headers,
