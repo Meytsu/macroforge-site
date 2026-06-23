@@ -220,6 +220,19 @@ export async function POST(req: NextRequest) {
 
     console.log(`Pagamento aprovado! E-mail: ${email}, Plano: ${plano}, Qty: ${quantidade}`);
 
+    // 0. Idempotência: o Mercado Pago REENVIA notificações de rotina (e poderiam ser
+    // repetidas/maliciosas). Se já criamos licença(s) pra este pagamento, não cria de
+    // novo — senão o mesmo pagamento gera chaves duplicadas (chave grátis extra).
+    const jaResp = await supabaseFetch(
+      `licencas?mp_payment_id=eq.${encodeURIComponent(String(paymentId))}&select=chave`,
+      { method: "GET" }
+    );
+    const jaExistentes = await jaResp.json();
+    if (Array.isArray(jaExistentes) && jaExistentes.length > 0) {
+      console.log(`Pagamento ${paymentId} já processado (${jaExistentes.length} chave(s)). Duplicata ignorada.`);
+      return NextResponse.json({ ok: true, jaProcessado: true });
+    }
+
     // 1. Busca ou cria o cliente
     let clienteId: string;
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { randomInt } from "crypto";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const SUPABASE_URL = process.env.SUPABASE_URL!;
@@ -87,8 +88,11 @@ export async function POST(req: NextRequest) {
 
     const nome = clientes[0].nome?.split(" ")[0] || "Cliente";
 
-    // Gera codigo de 6 digitos
-    const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+    // Código FORTE de 8 caracteres (cripto). O de 6 dígitos era brute-forçável:
+    // a verificação não tem limite de tentativas e ~1M combinações caíam em 15 min.
+    // 8 chars de um alfabeto de 32 (sem ambíguos I/O/0/1) ≈ 1,1 trilhão → inviável.
+    const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const codigo = Array.from({ length: 8 }, () => ALFABETO[randomInt(ALFABETO.length)]).join("");
     const expira = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutos
 
     // Salva no banco
@@ -111,7 +115,7 @@ export async function POST(req: NextRequest) {
           <p style="color: #8B949E; text-align: center;">Ola, ${nome}!</p>
           <p style="color: #8B949E; text-align: center; font-size: 14px;">Seu codigo de recuperacao de senha:</p>
           <div style="background: #161B22; border: 2px solid #D4A017; border-radius: 12px; padding: 20px; text-align: center; margin: 20px 0;">
-            <span style="font-family: monospace; font-size: 36px; font-weight: bold; color: #D4A017; letter-spacing: 8px;">${codigo}</span>
+            <span style="font-family: monospace; font-size: 30px; font-weight: bold; color: #D4A017; letter-spacing: 4px;">${codigo}</span>
           </div>
           <p style="color: #8B949E; text-align: center; font-size: 12px;">Valido por 15 minutos. Se nao foi voce, ignore este e-mail.</p>
           <p style="color: #30363D; text-align: center; font-size: 11px; margin-top: 24px;">MacroForge &copy; 2026</p>

@@ -25,9 +25,12 @@ export async function POST(req: NextRequest) {
     if (!/[a-z]/.test(novaSenha)) return NextResponse.json({ error: "Precisa de minuscula" }, { status: 400 });
     if (!/[!@#$%&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(novaSenha)) return NextResponse.json({ error: "Precisa de caractere especial" }, { status: 400 });
 
+    // Normaliza (maiúsculas/sem espaço) — o código gerado é alfanumérico maiúsculo.
+    const cod = String(codigo).trim().toUpperCase();
+
     // Verifica o codigo novamente
     const codRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/codigos_recuperacao?email=eq.${encodeURIComponent(email)}&codigo=eq.${codigo}&usado=eq.false&order=criado_em.desc&limit=1`,
+      `${SUPABASE_URL}/rest/v1/codigos_recuperacao?email=eq.${encodeURIComponent(email)}&codigo=eq.${encodeURIComponent(cod)}&usado=eq.false&order=criado_em.desc&limit=1`,
       { headers }
     );
     const codigos = await codRes.json();

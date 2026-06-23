@@ -17,9 +17,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Dados incompletos" }, { status: 400 });
     }
 
+    // Normaliza (maiúsculas/sem espaço) — o código gerado é alfanumérico maiúsculo.
+    const cod = String(codigo).trim().toUpperCase();
+
     // Busca o codigo mais recente nao usado
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/codigos_recuperacao?email=eq.${encodeURIComponent(email)}&codigo=eq.${codigo}&usado=eq.false&order=criado_em.desc&limit=1`,
+      `${SUPABASE_URL}/rest/v1/codigos_recuperacao?email=eq.${encodeURIComponent(email)}&codigo=eq.${encodeURIComponent(cod)}&usado=eq.false&order=criado_em.desc&limit=1`,
       { headers }
     );
     const codigos = await res.json();
