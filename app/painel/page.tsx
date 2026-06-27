@@ -207,20 +207,26 @@ export default function PainelPage() {
           </div>
         )}
 
-        {/* Download do app */}
+        {/* Fase de testes (closed beta) — durante o beta, o app não é baixado por APK direto;
+            o acesso é via Google Play (teste fechado por lista de e-mails). O usuário fala com
+            o Henrique pra entrar e ganhar 30 dias grátis. */}
         {ativas.length > 0 && (
-          <div className="mb-8 bg-[#161B22] border border-gray-800 rounded-xl p-5">
-            <div className="flex items-center justify-between">
+          <div className="mb-8 bg-[#161B22] border border-amber-500/40 rounded-xl p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h3 className="font-bold mb-1">Baixar MacroForge</h3>
-                <p className="text-gray-400 text-xs">Android 8.0+ | v1.0.0 | Funciona no celular e BlueStacks</p>
+                <h3 className="font-bold mb-1">App em fase de testes 🚀</h3>
+                <p className="text-gray-400 text-xs">
+                  Estamos no teste fechado pela Google Play. Entre agora e ganhe <span className="text-amber-500 font-semibold">30 dias grátis</span> —
+                  me chame no WhatsApp com seu e-mail do Google que eu libero seu acesso.
+                </p>
               </div>
               <a
-                href="https://github.com/Meytsu/macroforge-site/releases/download/v1.0.0/MacroForge_v1.0.0.apk"
-                className="bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-3 rounded-xl transition-colors text-sm flex-shrink-0"
-                download
+                href="https://wa.me/5581973197753?text=Quero%20entrar%20na%20fase%20de%20testes%20do%20MacroForge"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-3 rounded-xl transition-colors text-sm flex-shrink-0 text-center"
               >
-                Baixar APK
+                Quero participar
               </a>
             </div>
           </div>

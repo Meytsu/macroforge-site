@@ -78,7 +78,7 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <Step number="1" title="Assine" description="Escolha seu plano e pague via PIX" />
             <Step number="2" title="Receba a chave" description="Sua chave chega por e-mail na hora" />
-            <Step number="3" title="Ative no app" description="Baixe o APK e digite sua chave" />
+            <Step number="3" title="Ative no app" description="Instale pela Google Play e digite sua chave" />
             <Step number="4" title="Automatize" description="Crie macros e deixe o app trabalhar" />
           </div>
         </div>
