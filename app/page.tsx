@@ -95,10 +95,9 @@ export default function Home() {
             Promocao de lancamento — oferta por tempo limitado
           </p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           <PlanCard
             name="Mensal"
-            priceOld="14,90"
             price="9,90"
             period="/mes"
             plano="mensal"
@@ -111,26 +110,10 @@ export default function Home() {
             highlight={false}
           />
           <PlanCard
-            name="Trimestral"
-            priceOld="37,90"
-            price="24,90"
-            perMonth="8,30"
-            period="/3 meses"
-            plano="trimestral"
-            features={[
-              "Todas as funcionalidades",
-              "1 dispositivo",
-              "Suporte via WhatsApp",
-              "Atualizacoes incluidas",
-              "Economia de 15%",
-            ]}
-            highlight={true}
-          />
-          <PlanCard
             name="Semestral"
-            priceOld="66,90"
-            price="44,90"
-            perMonth="7,48"
+            priceOld="59,40"
+            price="47,90"
+            perMonth="7,98"
             period="/6 meses"
             plano="semestral"
             features={[
@@ -138,15 +121,15 @@ export default function Home() {
               "1 dispositivo",
               "Suporte prioritario",
               "Atualizacoes incluidas",
-              "Economia de 25%",
+              "Economia de 19%",
             ]}
-            highlight={false}
+            highlight={true}
           />
           <PlanCard
             name="Anual"
-            priceOld="116,90"
-            price="77,90"
-            perMonth="6,49"
+            priceOld="118,80"
+            price="79,90"
+            perMonth="6,66"
             period="/ano"
             plano="anual"
             badge="Melhor valor"
@@ -155,7 +138,7 @@ export default function Home() {
               "1 dispositivo",
               "Suporte prioritario",
               "Atualizacoes incluidas",
-              "Economia de 35%",
+              "Economia de 32%",
               "4 meses gratis",
             ]}
             highlight={false}
