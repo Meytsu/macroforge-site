@@ -50,7 +50,7 @@ export default function RecuperarPage() {
   }
 
   async function verificarCodigo() {
-    if (codigo.length !== 6) { setError("Digite o codigo de 6 digitos"); return; }
+    if (codigo.length !== 8) { setError("Digite o codigo de 8 caracteres"); return; }
     setLoading(true);
     setError("");
 
@@ -152,16 +152,16 @@ export default function RecuperarPage() {
           {etapa === 2 && (
             <>
               <p className="text-gray-400 text-sm text-center">
-                Enviamos um codigo de 6 digitos para <span className="text-amber-500">{email}</span>
+                Enviamos um codigo de 8 caracteres para <span className="text-amber-500">{email}</span>
               </p>
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Codigo</label>
                 <input
                   type="text" value={codigo}
-                  onChange={e => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onChange={e => setCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))}
                   onKeyDown={e => e.key === "Enter" && verificarCodigo()}
-                  placeholder="000000"
-                  maxLength={6}
+                  placeholder="XXXXXXXX"
+                  maxLength={8}
                   className="w-full px-4 py-3 rounded-lg bg-[#0D1117] border border-gray-700 text-white text-2xl text-center font-mono tracking-[0.5em] focus:border-amber-500 focus:outline-none"
                 />
               </div>
