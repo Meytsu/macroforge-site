@@ -207,30 +207,122 @@ export default function PainelPage() {
           </div>
         )}
 
-        {/* Fase de testes (closed beta) — durante o beta, o app não é baixado por APK direto;
-            o acesso é via Google Play (teste fechado por lista de e-mails). O usuário fala com
-            o Henrique pra entrar e ganhar 30 dias grátis. */}
-        {ativas.length > 0 && (
-          <div className="mb-8 bg-[#161B22] border border-amber-500/40 rounded-xl p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <h3 className="font-bold mb-1">App em fase de testes 🚀</h3>
-                <p className="text-gray-400 text-xs">
-                  Estamos no teste fechado pela Google Play. Entre agora e ganhe <span className="text-amber-500 font-semibold">30 dias grátis</span> —
-                  me chame no WhatsApp com seu e-mail do Google que eu libero seu acesso.
+        {/* Fase de testes (closed beta) — durante o beta o acesso é via Google Play (teste fechado
+            por Grupo do Google com auto-inscrição). Passo a passo pro usuário: entrar no grupo →
+            instalar pela Play → ativar o trial de 30 dias no app. Aparece pra todo usuário logado. */}
+        <div className="mb-8 bg-[#161B22] border border-amber-500/40 rounded-xl p-5">
+          <h3 className="font-bold mb-1">App em fase de testes</h3>
+          <p className="text-gray-400 text-sm mb-5">
+            Estamos no teste fechado pela Google Play. Siga os 3 passos abaixo para instalar e ganhar{" "}
+            <span className="text-amber-500 font-semibold">30 dias grátis</span>.
+          </p>
+
+          <ol className="space-y-4">
+            {/* Passo 1 — entrar no grupo */}
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500 text-amber-500 font-bold text-sm flex items-center justify-center">1</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-white mb-1">Entre no grupo de testadores</p>
+                <p className="text-gray-400 text-xs mb-2">
+                  Use a mesma Conta Google do seu celular. É só clicar em <span className="text-gray-300">Participar do grupo</span>.
+                </p>
+                <a
+                  href="https://groups.google.com/g/macroforge"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-400 font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+                >
+                  Entrar no grupo
+                </a>
+                <p className="text-gray-500 text-xs mt-3 mb-2">Toque em <span className="text-gray-300">Participar do grupo</span> e confirme:</p>
+                <div className="flex flex-col gap-4 max-w-xl">
+                  <Image
+                    src="/tutorial/beta-passo1-participar.png"
+                    alt="Botão Participar do grupo destacado na página do grupo"
+                    width={1100}
+                    height={393}
+                    className="rounded-lg border border-gray-700 w-full h-auto"
+                  />
+                  <Image
+                    src="/tutorial/beta-passo2-confirmar.png"
+                    alt="Janela de confirmação com o botão Participar do grupo"
+                    width={413}
+                    height={425}
+                    className="rounded-lg border border-gray-700 w-full h-auto max-w-xs"
+                  />
+                </div>
+              </div>
+            </li>
+
+            {/* Passo 2 — instalar pela Play */}
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500 text-amber-500 font-bold text-sm flex items-center justify-center">2</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-white mb-1">Instale pela Google Play</p>
+                <p className="text-gray-400 text-xs mb-2">
+                  Abra o link <strong className="text-amber-400">com a mesma Conta Google que você usou no grupo</strong>.
+                  Na página, toque em <span className="text-gray-300">Tornar-se testador</span> (ou <span className="text-gray-300">Become a tester</span>):
+                </p>
+                <a
+                  href="https://play.google.com/apps/testing/com.henrique.macroforge"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block bg-amber-500 hover:bg-amber-600 text-black font-bold px-4 py-2 rounded-lg transition-colors text-sm"
+                >
+                  Abrir na Google Play
+                </a>
+                <div className="flex flex-col gap-4 max-w-xl mt-3">
+                  <Image
+                    src="/tutorial/beta-play1-testador.png"
+                    alt="Botão Tornar-se testador destacado na página do teste"
+                    width={898}
+                    height={362}
+                    className="rounded-lg border border-gray-700 w-full h-auto"
+                  />
+                  <p className="text-gray-400 text-xs">
+                    Depois, toque em <span className="text-gray-300">Baixe-o no Google Play</span> (ou <span className="text-gray-300">download it on Google Play</span>) e instale o app:
+                  </p>
+                  <Image
+                    src="/tutorial/beta-play2-instalar.png"
+                    alt="Link para baixar o MacroForge no Google Play destacado"
+                    width={890}
+                    height={396}
+                    className="rounded-lg border border-gray-700 w-full h-auto"
+                  />
+                </div>
+                <p className="text-gray-500 text-xs mt-3">
+                  Acabou de entrar no grupo? A Play pode levar <strong className="text-gray-300">alguns minutos</strong> para liberar.
+                  Se aparecer “indisponível”, aguarde e tente de novo.
                 </p>
               </div>
-              <a
-                href="https://wa.me/5581973197753?text=Quero%20entrar%20na%20fase%20de%20testes%20do%20MacroForge"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-3 rounded-xl transition-colors text-sm flex-shrink-0 text-center"
-              >
-                Quero participar
-              </a>
-            </div>
+            </li>
+
+            {/* Passo 3 — ativar trial no app */}
+            <li className="flex gap-3">
+              <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500 text-amber-500 font-bold text-sm flex items-center justify-center">3</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-white mb-1">Ative seus 30 dias grátis no app</p>
+                <p className="text-gray-400 text-xs">
+                  Abra o MacroForge instalado e toque em <span className="text-gray-300">ativar trial</span>.
+                  Seu período grátis de teste começa na hora — sem precisar de chave.
+                </p>
+              </div>
+            </li>
+          </ol>
+
+          {/* Suporte */}
+          <div className="mt-5 pt-4 border-t border-gray-800 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-gray-500 text-xs">Travou em algum passo? Fale comigo.</p>
+            <a
+              href="https://wa.me/5581973197753?text=Preciso%20de%20ajuda%20pra%20entrar%20na%20fase%20de%20testes%20do%20MacroForge"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-green-500 hover:text-green-400 font-semibold text-sm"
+            >
+              Ajuda no WhatsApp
+            </a>
           </div>
-        )}
+        </div>
 
         {/* Botão comprar mais */}
         {licencas.length > 0 && (

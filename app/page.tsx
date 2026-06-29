@@ -36,6 +36,44 @@ export default function Home() {
         </div>
       </section>
 
+      {/* VEJA EM AÇÃO — dois vídeos lado a lado (player normal, clicável) */}
+      <section className="px-6 py-16 max-w-5xl mx-auto">
+        <h2 className="text-3xl font-bold text-center mb-3">Veja o MacroForge em ação</h2>
+        <p className="text-gray-400 text-center mb-8">
+          Conheça o app e aprenda a criar seu primeiro macro.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="font-semibold mb-3 text-center md:text-left">Apresentação</h3>
+            <div className="relative w-full rounded-xl overflow-hidden border border-gray-800 shadow-lg" style={{ aspectRatio: "16 / 9" }}>
+              <iframe
+                className="absolute inset-0 w-full h-full"
+                src="https://www.youtube-nocookie.com/embed/b3PY_MQbxY4?rel=0&modestbranding=1"
+                title="MacroForge — apresentação"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+                frameBorder="0"
+              />
+            </div>
+          </div>
+          <div>
+            <h3 className="font-semibold mb-3 text-center md:text-left">Criando seu primeiro macro</h3>
+            <div className="relative w-full rounded-xl overflow-hidden border border-gray-800 shadow-lg" style={{ aspectRatio: "16 / 9" }}>
+              <iframe
+                className="absolute inset-0 w-full h-full"
+                src="https://www.youtube-nocookie.com/embed/CBnf9NrIAz4?rel=0&modestbranding=1"
+                title="MacroForge — criando seu primeiro macro"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+                frameBorder="0"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FEATURES */}
       <section className="px-6 py-16 max-w-6xl mx-auto">
         <h2 className="text-3xl font-bold text-center mb-12">
