@@ -5,7 +5,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const TRIAL_DIAS = 7;
+// ISSUE-MF-118: durante o closed beta, o trial é GRAVADO com 30 dias (TRIAL_DIAS_INSERT).
+// Os TEXTOS do e-mail abaixo seguem dizendo "7 dias" propositalmente (decisão do Henrique
+// 2026-06-28 — não alterar os textos por ora; eles usam o literal "7", não esta constante).
+// O app calcula os dias restantes pela data_expiracao real, então 30 dias funcionam mesmo
+// com o texto "7". A "garantia de 7 dias" (reembolso PIX) é OUTRA coisa, sem relação com isto.
+const TRIAL_DIAS_INSERT = 30;   // tempo REAL gravado no banco (data_expiracao)
 
 const headers = {
   apikey: SUPABASE_KEY,
@@ -90,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     // 5. Gera chave trial
     const chave = gerarChave();
-    const expiracao = new Date(Date.now() + TRIAL_DIAS * 24 * 60 * 60 * 1000).toISOString();
+    const expiracao = new Date(Date.now() + TRIAL_DIAS_INSERT * 24 * 60 * 60 * 1000).toISOString();
 
     const licRes = await fetch(`${SUPABASE_URL}/rest/v1/licencas`, {
       method: "POST",
@@ -175,7 +180,7 @@ export async function POST(req: NextRequest) {
       chave,
       plano: "trial",
       expiracao,
-      dias: TRIAL_DIAS,
+      dias: TRIAL_DIAS_INSERT, // tempo REAL (30) — coerente com a data de expiração retornada
     });
   } catch (error) {
     console.error("Erro no ativar-trial:", error);
