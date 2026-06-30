@@ -8,15 +8,21 @@ import { NextResponse } from "next/server";
 // da versão nova e (se mudou) o apkUrl. O versionCode tem que casar com o do
 // app/build.gradle.kts. apkUrl = release pública no repo do site (GitHub Releases).
 const APP_VERSION = {
-  versionCode: 1,           // <-- bater com app/app/build.gradle.kts (defaultConfig.versionCode)
-  versionName: "1.0.0",
+  versionCode: 4,           // <-- bater com app/app/build.gradle.kts (defaultConfig.versionCode)
+  versionName: "1.0.1",
+  // Distribuição agora é via Google Play (closed beta). Se instalado pela Play, o app abre a
+  // página da Play (market://details). Este apkUrl é só FALLBACK (ex.: emulador sem Play) →
+  // aponta pra página do app na Play.
   apkUrl:
-    "https://github.com/Meytsu/macroforge-site/releases/download/v1.0.0/MacroForge_v1.0.0.apk",
+    "https://play.google.com/store/apps/details?id=com.henrique.macroforge",
   // Mudanças da versão atual (mostradas na tela Sobre / no aviso de atualização).
   changelog: [
-    "Condicionais aninhados: menu de edição completo (editar imagem/pixel, verificar, testar).",
-    "Planos reorganizados (Mensal / Semestral / Anual).",
-    "Melhorias de segurança e estabilidade da licença.",
+    "Correção de uso alto de memória ao usar 'Verificar imagem'.",
+    "Padrões das Configurações agora valem ao criar Localizar Imagem/Pixel.",
+    "Editar a imagem de um Repetir não zera mais o tempo configurado.",
+    "Licença aparece corretamente no menu lateral após ativar.",
+    "Ativação de licença agora é confirmada por você (não automática).",
+    "Telas de permissão rolam corretamente no celular deitado.",
   ],
   // true = update importante (o app pode insistir mais). Por padrão false (não força).
   obrigatorio: false,
