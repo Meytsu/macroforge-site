@@ -8,21 +8,25 @@ import { NextResponse } from "next/server";
 // da versão nova e (se mudou) o apkUrl. O versionCode tem que casar com o do
 // app/build.gradle.kts. apkUrl = release pública no repo do site (GitHub Releases).
 const APP_VERSION = {
-  versionCode: 5,           // <-- bater com app/app/build.gradle.kts (defaultConfig.versionCode)
-  versionName: "1.0.2",
+  versionCode: 7,           // <-- bater com app/app/build.gradle.kts (defaultConfig.versionCode)
+  versionName: "1.0.4",
   // Distribuição agora é via Google Play (closed beta). Se instalado pela Play, o app abre a
   // página da Play (market://details). Este apkUrl é só FALLBACK (ex.: emulador sem Play) →
   // aponta pra página do app na Play.
   apkUrl:
     "https://play.google.com/store/apps/details?id=com.henrique.macroforge",
   // Mudanças da versão atual (mostradas na tela Sobre / no aviso de atualização).
+  //
+  // ⚠️ ESTE TEXTO É LIDO PELO CLIENTE. Não anunciar o que não funciona.
+  // A v1.0.4 tem o Play Billing integrado no código, mas os 9 planos base estão em
+  // RASCUNHO no Play Console — logo o Google não devolve preço e o botão ASSINAR fica
+  // desabilitado. Escrever "assine pela Play" aqui seria mentir para quem vai encontrar
+  // um botão cinza. Quando os planos forem ativados, trocar a 2ª linha.
   changelog: [
-    "Overlay recolhível: toque em Ocultar e a barra vira uma bolha na borda; toque pra reabrir.",
-    "Novo botão Fechar (com confirmação) quando não há macro em execução.",
-    "Correção: overlay bugava ao trocar de tela em celulares dobráveis.",
-    "Correção: o efeito de toque no botão Ocultar não aparecia.",
-    "Correção: o app não sugere mais 'iniciar outro overlay' quando já está recolhido.",
-    "Macros de exemplo reorganizados em 2 pastas (Celular e Emulador).",
+    "Compatível com Android 16.",
+    "Preparação para assinatura pela Google Play — a compra ainda não está liberada.",
+    "Correção: o app podia fechar sozinho ao trocar de aba durante o login ou uma compra.",
+    "A tela de Planos passa a mostrar o preço vindo da Google Play, e avisa quando o valor muda depois do período promocional.",
   ],
   // true = update importante (o app pode insistir mais). Por padrão false (não força).
   obrigatorio: false,
