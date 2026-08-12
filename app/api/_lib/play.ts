@@ -345,13 +345,45 @@ export function decomporBasePlanId(basePlanId: string): PlanoDecomposto | null {
 // Compras anuladas (reembolso / chargeback)
 // ------------------------------------------------------------
 
+/** 0..8 conforme a referência REST do VoidedPurchase. Conferido na doc em 2026-08-10. */
+export const MOTIVO_ANULACAO: Record<number, string> = {
+  0: "outro",
+  1: "arrependimento",
+  2: "nao recebido",
+  3: "defeito",
+  4: "compra acidental",
+  5: "fraude",
+  6: "fraude amigavel",
+  7: "chargeback",
+  8: "compra nao confirmada",
+};
+
+/** 0 = usuário pediu · 1 = você (Play Console) · 2 = Google decidiu. */
+export const ORIGEM_ANULACAO: Record<number, string> = {
+  0: "usuario",
+  1: "desenvolvedor",
+  2: "google",
+};
+
 export interface CompraAnulada {
+  /** ⚠️ NÃO é único: renovações de assinatura repetem o mesmo token (doc oficial). */
   purchaseToken: string;
+  /** Único por transação. É este que serve de chave de dedupe, não o token. */
   orderId: string;
-  /** 1 = assinatura · 2 = produto avulso */
-  productType: number;
-  /** 1 = reembolso total · 2 = parcial por quantidade */
-  refundType: number;
+  /** Ver MOTIVO_ANULACAO. */
+  motivo: number;
+  motivoTexto: string;
+  /** Ver ORIGEM_ANULACAO. */
+  origem: number;
+  /**
+   * Presente SÓ em reembolso parcial por quantidade. `undefined` = anulação TOTAL.
+   *
+   * Na prática não deve aparecer aqui: (a) essas linhas só vêm se a chamada pedir
+   * `includeQuantityBasedPartialRefund=true`, o que não fazemos; e (b) os planos de 3 e 5
+   * chaves do MacroForge são planos base SEPARADOS, não compra de quantidade 3. Fica tratado
+   * mesmo assim — campo que "não deve aparecer" é o que aparece em produção.
+   */
+  quantidadeAnulada?: number;
   anuladaEm: string;
 }
 
@@ -366,9 +398,18 @@ export interface CompraAnulada {
  * <p>Pensado para rodar uma vez por dia (ISSUE-MF-129 / cron da Vercel).
  * Assim o pior caso cai de "um ano" para "24 horas".
  *
- * ⚠️ `refundType === 2` é reembolso PARCIAL e **não deveria** cortar acesso —
- * está registrado como pendência não resolvida no `sql/05`. Quem chamar esta
- * função precisa decidir o que fazer; ela só reporta.
+ * 🔴 CORRIGIDO EM 2026-08-10. O mapeamento anterior era:
+ *
+ *     refundType: Number(v.voidedReason ?? 1)   // comentado como "1 = total · 2 = parcial"
+ *
+ * **`voidedReason` é o MOTIVO, não o tipo.** Os valores reais são 0..8 (arrependimento,
+ * fraude, chargeback...). Quem fosse cortar acesso só quando `refundType === 1` cortaria
+ * apenas em **arrependimento** e deixaria passar **fraude, chargeback, defeito e compra
+ * acidental** — os casos que mais doem. O buraco continuaria aberto com aparência de fechado.
+ *
+ * O que de fato distingue parcial de total é `voidedQuantity`, e essas linhas só vêm se a
+ * chamada pedir `includeQuantityBasedPartialRefund=true` — o que NÃO fazemos. Portanto tudo
+ * que esta função devolve já é anulação TOTAL, e o chamador deve cortar em todas.
  *
  * @param desde momento a partir do qual buscar. O Google guarda 30 dias.
  */
@@ -389,11 +430,22 @@ export async function listarComprasAnuladas(desde: Date): Promise<CompraAnulada[
   const d = await res.json();
   const lista = Array.isArray(d.voidedPurchases) ? d.voidedPurchases : [];
 
-  return lista.map((v: Record<string, unknown>) => ({
-    purchaseToken: String(v.purchaseToken ?? ""),
-    orderId: String(v.orderId ?? ""),
-    productType: Number(v.voidedProductType ?? 1),
-    refundType: Number(v.voidedReason ?? 1),
-    anuladaEm: new Date(Number(v.voidedTimeMillis ?? 0)).toISOString(),
-  }));
+  return lista.map((v: Record<string, unknown>) => {
+    const motivo = Number(v.voidedReason ?? 0);
+    // `voidedQuantity` ausente = anulação total. Só converte quando o campo existe de fato —
+    // `Number(undefined)` daria NaN e um NaN aqui viraria "parcial" por acidente.
+    const q = v.voidedQuantity === undefined || v.voidedQuantity === null
+      ? undefined
+      : Number(v.voidedQuantity);
+
+    return {
+      purchaseToken: String(v.purchaseToken ?? ""),
+      orderId: String(v.orderId ?? ""),
+      motivo,
+      motivoTexto: MOTIVO_ANULACAO[motivo] ?? `desconhecido(${motivo})`,
+      origem: Number(v.voidedSource ?? 0),
+      quantidadeAnulada: q,
+      anuladaEm: new Date(Number(v.voidedTimeMillis ?? 0)).toISOString(),
+    };
+  });
 }

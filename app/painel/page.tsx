@@ -151,12 +151,20 @@ export default function PainelPage() {
             <div className="space-y-4">
               {ativas.map(lic => (
                 <LicencaCard key={lic.chave} licenca={lic} email={cliente.email} onReset={() => {
-                  // Recarrega dados do servidor
-                  fetch("/api/login", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email: cliente.email, senha: "_skip_" }),
-                  });
+                  // 🔴 REMOVIDO em 2026-08-09 — aqui havia um POST no /api/login com a
+                  // senha literal "_skip_", sob o comentário "Recarrega dados do servidor".
+                  //
+                  // Ele não recarregava nada (a resposta era descartada, sem await), e a
+                  // senha falsa caía no ramo de senha errada do login, que chama
+                  // `registrarTentativa(email, false)`. Ou seja: **cada reset de dispositivo
+                  // contava como uma tentativa de invasão**. No quinto, a conta era
+                  // bloqueada por 15 minutos — e o alvo natural é o cliente com VÁRIAS
+                  // chaves, que troca de celular e libera todos os aparelhos de uma vez.
+                  //
+                  // Achado pelo Henrique. Nada entra no lugar: o reset muda só o
+                  // `device_id`, o servidor já confirmou (data.ok), e as linhas abaixo já
+                  // gravam exatamente essa mudança. Pra rebuscar do servidor de verdade, o
+                  // caminho é o GET /api/painel com o crachá, como na abertura da tela.
                   // Atualiza localmente
                   const updated = { ...lic, device_id: null };
                   const newLicencas = licencas.map(l => l.chave === lic.chave ? updated : l);
@@ -176,12 +184,20 @@ export default function PainelPage() {
             <div className="space-y-4">
               {outras.map(lic => (
                 <LicencaCard key={lic.chave} licenca={lic} email={cliente.email} onReset={() => {
-                  // Recarrega dados do servidor
-                  fetch("/api/login", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email: cliente.email, senha: "_skip_" }),
-                  });
+                  // 🔴 REMOVIDO em 2026-08-09 — aqui havia um POST no /api/login com a
+                  // senha literal "_skip_", sob o comentário "Recarrega dados do servidor".
+                  //
+                  // Ele não recarregava nada (a resposta era descartada, sem await), e a
+                  // senha falsa caía no ramo de senha errada do login, que chama
+                  // `registrarTentativa(email, false)`. Ou seja: **cada reset de dispositivo
+                  // contava como uma tentativa de invasão**. No quinto, a conta era
+                  // bloqueada por 15 minutos — e o alvo natural é o cliente com VÁRIAS
+                  // chaves, que troca de celular e libera todos os aparelhos de uma vez.
+                  //
+                  // Achado pelo Henrique. Nada entra no lugar: o reset muda só o
+                  // `device_id`, o servidor já confirmou (data.ok), e as linhas abaixo já
+                  // gravam exatamente essa mudança. Pra rebuscar do servidor de verdade, o
+                  // caminho é o GET /api/painel com o crachá, como na abertura da tela.
                   // Atualiza localmente
                   const updated = { ...lic, device_id: null };
                   const newLicencas = licencas.map(l => l.chave === lic.chave ? updated : l);
@@ -209,12 +225,12 @@ export default function PainelPage() {
 
         {/* Fase de testes (closed beta) — durante o beta o acesso é via Google Play (teste fechado
             por Grupo do Google com auto-inscrição). Passo a passo pro usuário: entrar no grupo →
-            instalar pela Play → ativar o trial de 30 dias no app. Aparece pra todo usuário logado. */}
+            instalar pela Play → ativar o trial de 7 dias no app. Aparece pra todo usuário logado. */}
         <div className="mb-8 bg-[#161B22] border border-amber-500/40 rounded-xl p-5">
           <h3 className="font-bold mb-1">App em fase de testes</h3>
           <p className="text-gray-400 text-sm mb-5">
             Estamos no teste fechado pela Google Play. Siga os 3 passos abaixo para instalar e ganhar{" "}
-            <span className="text-amber-500 font-semibold">30 dias grátis</span>.
+            <span className="text-amber-500 font-semibold">7 dias grátis</span>.
           </p>
 
           <ol className="space-y-4">
@@ -301,7 +317,7 @@ export default function PainelPage() {
             <li className="flex gap-3">
               <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500 text-amber-500 font-bold text-sm flex items-center justify-center">3</span>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-white mb-1">Ative seus 30 dias grátis no app</p>
+                <p className="text-sm font-semibold text-white mb-1">Ative seus 7 dias grátis no app</p>
                 <p className="text-gray-400 text-xs">
                   Abra o MacroForge instalado e toque em <span className="text-gray-300">ativar trial</span>.
                   Seu período grátis de teste começa na hora — sem precisar de chave.

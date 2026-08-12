@@ -241,12 +241,29 @@ export async function POST(req: NextRequest) {
     });
     const clientes = await clienteResp.json();
 
+    // PAGAMENTO APROVADO CONFIRMA O E-MAIL (ISSUE-MF-133).
+    //
+    // Este é o ÚNICO lugar do sistema onde comprar marca `email_confirmado`. Aqui já
+    // existe dinheiro: o `status !== "approved"` foi barrado lá em cima.
+    //
+    // Cobre os dois caminhos, e o segundo é o que o Henrique levantou:
+    //   - comprou sem ter conta          -> a linha nasce já confirmada
+    //   - CADASTROU e depois comprou     -> a linha existia com false, e o PATCH corrige
+    // O checkout sozinho não cobriria o segundo caso: lá a linha já existe, então ele
+    // nunca passa pelo ramo de criação.
     if (clientes.length > 0) {
       clienteId = clientes[0].id;
+
+      if (clientes[0].email_confirmado === false) {
+        await supabaseFetch(`clientes?id=eq.${clienteId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ email_confirmado: true }),
+        });
+      }
     } else {
       const novoResp = await supabaseFetch("clientes", {
         method: "POST",
-        body: JSON.stringify({ nome: email.split("@")[0], email }),
+        body: JSON.stringify({ nome: email.split("@")[0], email, email_confirmado: true }),
       });
       const novos = await novoResp.json();
       clienteId = novos[0].id;

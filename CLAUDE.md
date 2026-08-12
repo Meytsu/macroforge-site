@@ -22,7 +22,7 @@ Site Next.js do MacroForge:
 - **Landing page** (`/`)
 - **Cadastro** (`/cadastro`) — nome + email + senha (bcrypt)
 - **Login** (`/login`) — sessão em sessionStorage
-- **Recuperação de senha** (`/recuperar`) — 3 etapas com código 6-dígitos via Resend
+- **Recuperação de senha** (`/recuperar`) — 3 etapas com código de **8 caracteres** via Resend
 - **Painel do cliente** (`/painel`) — licenças ativas, device_id, dados pessoais
 - **Planos** (`/planos`) — 3 cards (mensal/trimestral/semestral)
 - **Páginas de retorno** (`/sucesso`, `/falha`, `/pendente`) — pós-pagamento
@@ -38,7 +38,7 @@ Site Next.js do MacroForge:
 | UI | React 19.2.4 + TypeScript 5 |
 | Styling | Tailwind CSS 4 + PostCSS |
 | Hosting | Vercel (auto-deploy no push pro `master`) |
-| URL produção | `https://macroforge-app.vercel.app` |
+| URL produção | `https://macroforge.com.br` (domínio próprio desde 2026-05-20; o `*.vercel.app` continua respondendo, mas não é o endereço oficial — o app Android aponta pro domínio) |
 
 ### Dependências principais
 
@@ -88,7 +88,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000  # fallback se faltar
 - `SUPABASE_URL` + `SUPABASE_SERVICE_KEY`: 13 API routes (login, registro, checkout, webhook, recuperar-senha, alterar-senha, atualizar-dados, check-email, nova-senha, reset-device, verificar-codigo, etc.)
 - `MP_ACCESS_TOKEN`: `/api/checkout` (cria sessão Checkout Pro) + `/api/webhook` (recebe confirmação)
 - `RESEND_API_KEY`: `/api/recuperar-senha`, `/api/webhook` (envia email pós-pagamento), `/api/test-email`
-- `NEXT_PUBLIC_SITE_URL`: fallback pra URL no `/api/checkout` (em prod é `https://macroforge-app.vercel.app`)
+- `NEXT_PUBLIC_SITE_URL`: fallback pra URL no `/api/checkout` (em prod é `https://macroforge.com.br`)
 
 **Sem `.env.local`:** site sobe (`npm run dev`), páginas estáticas carregam, mas API routes dão erro 500 (variáveis `!` no TypeScript explodem).
 
@@ -111,14 +111,41 @@ npm run lint           # ESLint
 ### 1. Sessão em sessionStorage (não persiste)
 A sessão é guardada em `sessionStorage` (some quando fecha a aba). Decisão: ADR-MF-SITE-002. UX trade-off conhecido.
 
-### 2. Resend sem domínio próprio
-Hoje, Resend está configurado sem domínio próprio (`macroforge.com.br` ainda não comprado). Limitação:
-- Só envia email pro **email do dono da conta Resend** (Henrique)
-- Outros usuários **não recebem** o email de recuperação de senha automaticamente
-- Solução em ISSUE-MF-009 (comprar domínio)
+### 2. Resend COM domínio próprio — envia pra qualquer destinatário ✅
 
-### 3. Email caindo em spam (Outlook)
-BUG aberto: emails de `noreply@macroforge.com.br` caem em spam no Outlook. Causa: DMARC não configurado. Ver BUG-FR-004 no `bugs.md` do repo privado.
+> ⚠️ **Corrigido em 2026-08-09.** Esta seção dizia, por 3 meses, que o Resend estava *"sem domínio
+> próprio"* e que *"outros usuários não recebem o email"*. **Falso desde 2026-05-20.** O erro
+> importa mais do que parece: o `CLAUDE.md` é carregado em toda sessão, então uma afirmação errada
+> aqui é **repetida como verdade** em vez de ser reconferida. Ela chegou a barrar uma decisão de
+> segurança (confirmação de e-mail como defesa da ISSUE-MF-133), até que o DNS foi medido.
+
+Estado real, medido em 2026-08-09:
+
+```
+Resend → Domains       macroforge.com.br · Verified · São Paulo (sa-east-1) · criado há 3 meses
+DKIM   resend._domainkey.macroforge.com.br     ✅ chave publicada
+SPF    send.macroforge.com.br  TXT             ✅ "v=spf1 include:amazonses.com ~all"
+MX     send.macroforge.com.br                  ✅ feedback-smtp.sa-east-1.amazonses.com
+DMARC  _dmarc.macroforge.com.br                ✅ "v=DMARC1; p=none; rua=..."
+```
+
+Remetente usado em todas as rotas: `MacroForge <noreply@macroforge.com.br>`
+(`ativar-trial`, `recuperar-senha`, `webhook` ×2).
+
+**Consequência prática:** e-mail transacional pra cliente funciona. Fluxos que dependiam disso —
+confirmação de cadastro, faxina de conta não confirmada, aviso de expiração — estão liberados.
+
+**O que ainda NÃO está resolvido:** entregabilidade. `p=none` é a política DMARC mais fraca (só
+observa, não exige nada de quem recebe), então a entrega ainda depende de reputação do remetente.
+Antes de usar e-mail como **portão** (ex.: apagar conta não confirmada em 24 h), confira na aba
+**Emails** do Resend se os envios reais estão como *Delivered* — senão você apaga cliente legítimo
+cujo e-mail caiu em spam.
+
+### 3. Spam no Outlook — resolvido
+
+`BUG-FR-004` (e-mails caindo em spam no Outlook por falta de DMARC) está **🟢 resolvido** no
+`bugs.md` do repo privado, e o DMARC está publicado (ver bloco acima). Reabrir só se aparecer
+relato novo de usuário.
 
 ### 4. Sessão de pagamento — webhook é a fonte da verdade
 A sessão de pagamento do MP gera redirect pras páginas `/sucesso`, `/falha`, `/pendente`. **NÃO confiar nesses redirects** pra confirmar pagamento — usuário pode fechar a aba antes. **Confiar só no webhook** (`/api/webhook`) que dispara independente do redirect.

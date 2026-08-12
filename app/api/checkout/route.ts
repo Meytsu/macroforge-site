@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Preference } from "mercadopago";
 
-// Preços alinhados ao app e à página /planos (MF-103, 2026-06-20). Trimestral removido.
-// price = preço de 1 chave (base); o desconto de volume é aplicado por getDesconto().
-const PLANOS: Record<string, { title: string; price: number; days: number }> = {
-  mensal: { title: "MacroForge — Mensal", price: 9.9, days: 30 },
-  semestral: { title: "MacroForge — Semestral", price: 47.9, days: 180 },
-  anual: { title: "MacroForge — Anual", price: 79.9, days: 365 },
-};
-
-function getDesconto(qty: number): number {
-  if (qty >= 20) return 0.3;
-  if (qty >= 10) return 0.25;
-  if (qty >= 5) return 0.15;
-  if (qty >= 3) return 0.1;
-  return 0;
-}
+// 🔴 A TABELA DE PREÇOS SAIU DAQUI em 2026-08-09. Agora vem de `app/lib/precos.ts`, que
+// espelha o Google Play — e a página /planos lê a MESMA função.
+//
+// O que havia aqui era uma segunda tabela, independente da tela e independente do Play:
+// `price` (9,90 / 47,90 / 79,90) mais uma escada de 10%/15%. Resultado medido: divergência em
+// 6 das 9 combinações, e em duas delas o site cobrava MAIS CARO que o app pelo mesmo produto
+// (mensal x5: Play 41,90, site 42,10 · semestral x3: Play 128,90, site 129,33).
+//
+// Não adicione preço aqui de novo. Preço é dado, e mora num lugar só.
+import { precoTotal, NOME_PLANO, MAX_CHAVES, ehPlanoValido } from "@/app/lib/precos";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
@@ -29,10 +24,9 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { plano, email, nome, whatsapp, pais, estado, cidade, codigo_pais } = body;
-    const quantidade = Math.max(1, Math.min(25, parseInt(body.quantidade, 10) || 1));
+    const quantidade = Math.max(1, Math.min(MAX_CHAVES, parseInt(body.quantidade, 10) || 1));
 
-    const plan = PLANOS[plano];
-    if (!plan) {
+    if (!ehPlanoValido(plano)) {
       return NextResponse.json({ error: "Plano invalido" }, { status: 400 });
     }
 
@@ -40,13 +34,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "E-mail invalido" }, { status: 400 });
     }
 
-    // Calcula preco com desconto de volume
-    const desconto = getDesconto(quantidade);
-    const precoUnitario = Math.round(plan.price * (1 - desconto) * 100) / 100;
-    const total = Math.round(precoUnitario * quantidade * 100) / 100;
+    // O MESMO número que a tela /planos mostrou. Uma função, dois consumidores — é isto que
+    // torna "o preço da tela difere do cobrado" impossível, em vez de improvável.
+    const total = precoTotal(plano, quantidade);
 
-    // Salva/atualiza o cliente no Supabase antes do pagamento
-    if (nome && SUPABASE_URL && SUPABASE_KEY) {
+    // ============================================================
+    // SÓ COMPRA QUEM JÁ TEM CONTA (decisão do Henrique, 2026-08-09 — ISSUE-MF-140)
+    // ============================================================
+    // Esta rota NÃO cobra nada: ela só monta a tela de pagamento do Mercado Pago. Mas
+    // gravava cliente no banco antes disso, sem login e sem pagamento — uma segunda porta
+    // de criação de contas em massa, que a regra de firewall (presa em `/api/registro`)
+    // não cobre.
+    //
+    // Agora ela EXIGE conta existente. Fecha a porta na origem, em vez de tentar filtrar
+    // quem passa por ela.
+    //
+    // Por que o custo é quase zero: a tela de planos já obrigava login
+    // (`planos/page.tsx` → `if (!logado) router.push("/login")`) e **nunca enviava `nome`**,
+    // então o bloco antigo de criação era inalcançável pelo site. Só abria por chamada
+    // direta à API — isto é, só pra quem estava abusando.
+    //
+    // ⚠️ A checagem tem que ser AQUI, no servidor. A do front é conveniência: qualquer um
+    // chama a rota direto e pula o `router.push`.
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      // Sem banco não dá pra provar que a conta existe. Recusa em vez de deixar passar —
+      // um portão que "libera quando não consegue checar" não é um portão.
+      console.error("checkout: Supabase nao configurado; recusando por seguranca");
+      return NextResponse.json({ error: "Servico indisponivel" }, { status: 503 });
+    }
+
+    {
       const headers = {
         apikey: SUPABASE_KEY,
         Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -60,25 +77,43 @@ export async function POST(req: NextRequest) {
       );
       const existing = await checkRes.json();
 
-      const clienteData = {
-        nome,
-        email,
-        whatsapp: whatsapp || null,
-        pais: pais || null,
-        estado: estado || null,
-        cidade: cidade || null,
-        codigo_pais: codigo_pais || null,
-      };
+      if (!Array.isArray(existing) || existing.length === 0) {
+        return NextResponse.json(
+          {
+            error: "Crie sua conta antes de comprar.",
+            precisaCadastro: true,
+          },
+          { status: 403 }
+        );
+      }
 
-      if (existing.length > 0) {
+      // NOTA: não exigimos `email_confirmado` aqui, de propósito. Confirmar é portão só
+      // do TRIAL (o que tem valor pra quem abusa). Quem está com o cartão na mão não
+      // esbarra em burocracia — e pagar já confirma, pelo /api/webhook.
+
+      // A conta existe. Atualiza os dados opcionais que vieram no corpo, se vieram.
+      //
+      // ⚠️ `email_confirmado` NÃO entra neste PATCH, e é deliberado (ISSUE-MF-133): aqui
+      // ainda não houve pagamento nenhum. Marcar `true` daria confirmação de graça a quem
+      // só CHAMA a rota. Quem marca é o /api/webhook, no `approved`.
+      //
+      // ⚠️ E NÃO existe mais ramo de criação. Se você veio "consertar" um erro de conta
+      // inexistente adicionando um POST aqui, pare: era exatamente o buraco da
+      // ISSUE-MF-140. O caminho certo é o usuário se cadastrar.
+      if (nome) {
+        const clienteData = {
+          nome,
+          email,
+          whatsapp: whatsapp || null,
+          pais: pais || null,
+          estado: estado || null,
+          cidade: cidade || null,
+          codigo_pais: codigo_pais || null,
+        };
+
         await fetch(
           `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}`,
           { method: "PATCH", headers, body: JSON.stringify(clienteData) }
-        );
-      } else {
-        await fetch(
-          `${SUPABASE_URL}/rest/v1/clientes`,
-          { method: "POST", headers, body: JSON.stringify(clienteData) }
         );
       }
     }
@@ -95,7 +130,7 @@ export async function POST(req: NextRequest) {
         items: [
           {
             id: `${plano}_x${quantidade}`,
-            title: `${plan.title}${titleSuffix}`,
+            title: `${NOME_PLANO[plano]}${titleSuffix}`,
             quantity: 1,
             unit_price: total,
             currency_id: "BRL",

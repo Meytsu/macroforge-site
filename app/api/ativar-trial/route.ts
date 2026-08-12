@@ -5,12 +5,24 @@ const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// ISSUE-MF-118: durante o closed beta, o trial é GRAVADO com 30 dias (TRIAL_DIAS_INSERT).
-// Os TEXTOS do e-mail abaixo seguem dizendo "7 dias" propositalmente (decisão do Henrique
-// 2026-06-28 — não alterar os textos por ora; eles usam o literal "7", não esta constante).
-// O app calcula os dias restantes pela data_expiracao real, então 30 dias funcionam mesmo
-// com o texto "7". A "garantia de 7 dias" (reembolso PIX) é OUTRA coisa, sem relação com isto.
-const TRIAL_DIAS_INSERT = 30;   // tempo REAL gravado no banco (data_expiracao)
+// TRIAL DE 7 DIAS — decisão do Henrique em 2026-08-10, fechando a ISSUE-MF-118.
+//
+// Volta ao valor original. Os 30 dias eram incentivo EXCLUSIVO do teste fechado, pra recrutar
+// testador; no teste aberto entra qualquer um e viraria "um mês grátis pra cada futuro
+// pagante". Ele considerou 14 como meio termo e decidiu por 7 — o que tem uma vantagem que
+// nenhum outro valor tinha: **o app já diz 7 em todos os textos**, então nenhum AAB novo é
+// necessário e os três lugares passam a concordar sem tocar no Android.
+//
+// 🔴 O ESTADO ANTERIOR ERA PIOR QUE ERRADO — ERA TRÊS NÚMEROS DIFERENTES:
+//     banco gravava           30 dias
+//     e-mail e app diziam      7 dias   (deliberado em 2026-06-28, "não alterar os textos")
+//     painel do site dizia    30 dias grátis
+// O cliente lia 7 no app, 30 no painel, e recebia 30. Agora é 7 em todos os lugares — e
+// esta constante é a ÚNICA fonte: os textos abaixo a interpolam, não repetem o número.
+//
+// ⚠️ NÃO confundir com a "garantia de 7 dias" (reembolso via PIX) da landing e da /planos.
+// São coisas diferentes e aquela continua sendo 7.
+const TRIAL_DIAS_INSERT = 7;   // tempo REAL gravado no banco (data_expiracao)
 
 const headers = {
   apikey: SUPABASE_KEY,
@@ -40,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     // 1. Busca o cliente
     const clienteRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}&select=id,nome,email`,
+      `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}&select=id,nome,email,email_confirmado`,
       { headers }
     );
     const clientes = await clienteRes.json();
@@ -50,6 +62,28 @@ export async function POST(req: NextRequest) {
     }
 
     const cliente = clientes[0];
+
+    // 1.5 — TRIAL EXIGE E-MAIL CONFIRMADO (ISSUE-MF-133)
+    //
+    // Este é o único portão de confirmação do sistema, e é aqui de propósito: o trial é a
+    // ÚNICA coisa que o cadastro sozinho pode render — 7 dias de PRO sem pagar nada. É
+    // exatamente o que tem valor pra quem cria conta em massa.
+    //
+    // Comprar continua liberado (decisão de 2026-08-09): quem está com o cartão na mão não
+    // esbarra em burocracia, e pagar já confirma pelo /api/webhook.
+    //
+    // `=== false` e não `!cliente.email_confirmado`: se a coluna ainda não existir no banco
+    // (sql/09 não rodado), o campo vem `undefined` e o `!` recusaria o trial de TODO MUNDO.
+    // Assim, banco desatualizado deixa passar em vez de quebrar o app de quem já usa.
+    if (cliente.email_confirmado === false) {
+      return NextResponse.json(
+        {
+          error: "Confirme seu e-mail para ativar o trial.",
+          precisaConfirmar: true,
+        },
+        { status: 403 }
+      );
+    }
 
     // 2. Verifica se esse device_id ja teve trial
     const trialDeviceRes = await fetch(
@@ -125,7 +159,7 @@ export async function POST(req: NextRequest) {
       await resend.emails.send({
         from: "MacroForge <noreply@macroforge.com.br>",
         to: email,
-        subject: "Seu trial MacroForge de 7 dias esta ativo!",
+        subject: `Seu trial MacroForge de ${TRIAL_DIAS_INSERT} dias esta ativo!`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #0D1117; color: #fff; padding: 32px; border-radius: 16px;">
             <div style="text-align: center; margin-bottom: 24px;">
@@ -134,7 +168,7 @@ export async function POST(req: NextRequest) {
             </div>
 
             <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-              <p style="color: #4CAF50; font-size: 16px; font-weight: bold; margin: 0 0 8px 0;">Trial de 7 dias ativado!</p>
+              <p style="color: #4CAF50; font-size: 16px; font-weight: bold; margin: 0 0 8px 0;">Trial de ${TRIAL_DIAS_INSERT} dias ativado!</p>
               <p style="color: #8B949E; font-size: 14px; margin: 0 0 12px 0;">Sua chave:</p>
               <div style="background: #0D1117; border: 2px solid #D4A017; border-radius: 8px; padding: 16px; text-align: center;">
                 <span style="font-family: monospace; font-size: 24px; font-weight: bold; color: #D4A017; letter-spacing: 2px;">${chave}</span>
@@ -145,7 +179,7 @@ export async function POST(req: NextRequest) {
               <table style="width: 100%; font-size: 14px;">
                 <tr>
                   <td style="color: #8B949E; padding: 4px 0;">Plano</td>
-                  <td style="color: #fff; text-align: right; padding: 4px 0;">Trial gratuito (7 dias)</td>
+                  <td style="color: #fff; text-align: right; padding: 4px 0;">Trial gratuito (${TRIAL_DIAS_INSERT} dias)</td>
                 </tr>
                 <tr>
                   <td style="color: #8B949E; padding: 4px 0;">Valido ate</td>
@@ -156,7 +190,7 @@ export async function POST(req: NextRequest) {
 
             <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
               <p style="color: #8B949E; font-size: 13px; margin: 0;">
-                Aproveite todas as funcionalidades PRO durante 7 dias. Ao final, assine para continuar usando:
+                Aproveite todas as funcionalidades PRO durante ${TRIAL_DIAS_INSERT} dias. Ao final, assine para continuar usando:
                 <a href="https://macroforge.com.br/planos" style="color: #D4A017;">ver planos</a>
               </p>
             </div>
@@ -180,7 +214,7 @@ export async function POST(req: NextRequest) {
       chave,
       plano: "trial",
       expiracao,
-      dias: TRIAL_DIAS_INSERT, // tempo REAL (30) — coerente com a data de expiração retornada
+      dias: TRIAL_DIAS_INSERT, // 7 — coerente com a data de expiração, com o e-mail e com o app
     });
   } catch (error) {
     console.error("Erro no ativar-trial:", error);

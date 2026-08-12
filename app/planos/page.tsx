@@ -3,55 +3,26 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import {
+  precoTotal, precoPorChave, economiaVolume, descontoVolumePct,
+  equivalenteMensal, economiaPeriodoPct, MESES, MAX_CHAVES, ehPlanoValido,
+  type PlanoId,
+} from "@/app/lib/precos";
 
-// Planos alinhados ao app (MF-103): sem trimestral; precoLancamento = preco fixo de 1 chave
-// (igual ao app), arredondado a ,90. POPULAR no Semestral; MELHOR VALOR no Anual.
-// precoRegular = preco "de" (riscado) = equivalente mensal avulso (9,90 x meses), pra mostrar
-// a economia da assinatura longa. economia = desconto da assinatura (floor, nunca infla).
-const PLANOS = [
-  {
-    id: "mensal",
-    nome: "Mensal",
-    precoRegular: 9.9,
-    precoLancamento: 9.9,
-    periodo: "/mes",
-    meses: 1,
-    destaque: false,
-  },
-  {
-    id: "semestral",
-    nome: "Semestral",
-    precoRegular: 59.4, // 9,90 x 6 (mensal avulso)
-    precoLancamento: 47.9,
-    periodo: "/6 meses",
-    meses: 6,
-    destaque: true,
-    economia: "19%",
-  },
-  {
-    id: "anual",
-    nome: "Anual",
-    precoRegular: 118.8, // 9,90 x 12 (mensal avulso)
-    precoLancamento: 79.9,
-    periodo: "/ano",
-    meses: 12,
-    destaque: false,
-    economia: "32%",
-    melhorValor: true,
-    bonus: "4 meses gratis",
-  },
+// SEM PREÇO AQUI. Só identidade e rótulo — todo valor vem de app/lib/precos.ts.
+// Os antigos precoRegular (59,40 / 118,80) e economia ("19%" / "32%") eram números escritos
+// à mão que continuariam de pé depois de a promoção acabar no Play. Agora são derivados.
+const PLANOS: Array<{
+  id: PlanoId; nome: string; periodo: string;
+  destaque?: boolean; melhorValor?: boolean; bonus?: string;
+}> = [
+  { id: "mensal",    nome: "Mensal",    periodo: "/mes" },
+  { id: "semestral", nome: "Semestral", periodo: "/6 meses", destaque: true },
+  { id: "anual",     nome: "Anual",     periodo: "/ano", melhorValor: true, bonus: "4 meses gratis" },
 ];
 
-// Teto de quantidade no site (app usa fixo 1/3/5; site permite ate este maximo).
-const MAX_CHAVES = 25;
-
-function getDesconto(qty: number): number {
-  if (qty >= 20) return 0.3;
-  if (qty >= 10) return 0.25;
-  if (qty >= 5) return 0.15;
-  if (qty >= 3) return 0.1;
-  return 0;
-}
+// MAX_CHAVES e a escada de desconto saíram daqui — vêm de `app/lib/precos.ts`, junto com os
+// preços. Duplicar o teto em dois arquivos é como o site acabou com duas tabelas divergentes.
 
 function formatPrice(value: number): string {
   return value.toFixed(2).replace(".", ",");
@@ -84,23 +55,30 @@ export default function PlanosPage() {
     }
   }, []);
 
-  const plano = PLANOS.find((p) => p.id === planoId) ?? PLANOS[0];
-  const mensalRef = PLANOS.find((p) => p.id === "mensal")!;
-  const mesesNoPlano = plano.meses;
-  const desconto = getDesconto(quantidade);
-  const precoUnitario = plano.precoLancamento * (1 - desconto);
-  const totalComDesconto = precoUnitario * quantidade;
-  const totalSemDesconto = plano.precoLancamento * quantidade;
+  // 🔴 TODO NÚMERO DAQUI PRA BAIXO VEM DE `app/lib/precos.ts` — a MESMA função que o
+  // /api/checkout usa pra cobrar. Antes, a tela calculava por conta própria e o checkout
+  // calculava de novo, com arredondamentos diferentes: em 6 das 9 combinações os dois
+  // discordavam, e o cliente via um número e pagava outro.
+  const idPlano: PlanoId = ehPlanoValido(planoId) ? planoId : "mensal";
+  const plano = PLANOS.find((p) => p.id === idPlano) ?? PLANOS[0];
+  const mesesNoPlano = MESES[idPlano];
 
-  // Economia do periodo (tri/sem vs mensal equivalente)
-  const equivalenteMensal = mensalRef.precoLancamento * mesesNoPlano * quantidade;
-  const economiaPeriodo = equivalenteMensal - totalSemDesconto;
+  const totalComDesconto = precoTotal(idPlano, quantidade);
+  const precoUnitario = precoPorChave(idPlano, quantidade);
+  const totalSemDesconto = precoTotal(idPlano, 1) * quantidade;
 
-  // Economia do volume (desconto por quantidade)
-  const economiaVolume = totalSemDesconto - totalComDesconto;
+  // Desconto de volume DERIVADO do preço real, não uma constante escrita à mão.
+  const desconto = descontoVolumePct(idPlano, quantidade) / 100;
+
+  // Economia do periodo (semestral/anual vs pagar mensal pelo mesmo tempo)
+  const equivalenteMensalTotal = equivalenteMensal(idPlano, quantidade);
+  const economiaPeriodo = Math.max(0, equivalenteMensalTotal - totalSemDesconto);
+
+  // Economia do volume (comprar N de uma vez vs N compras de 1)
+  const economiaVolumeValor = economiaVolume(idPlano, quantidade);
 
   // Total economizado
-  const economiaTotal = economiaPeriodo + economiaVolume;
+  const economiaTotal = economiaPeriodo + economiaVolumeValor;
 
   function handleQtyButton(qty: number) {
     setQuantidade(qty);
@@ -139,6 +117,17 @@ export default function PlanosPage() {
       });
 
       const data = await res.json();
+
+      // O servidor recusa compra de quem não tem conta (ISSUE-MF-140). Isso normalmente
+      // não acontece — esta tela já manda pro login antes —, mas a sessão pode ter
+      // expirado, ou a conta ter sido apagada pela faxina de não confirmados. Mandar pro
+      // cadastro é a saída; mostrar "Crie sua conta antes de comprar" numa caixa de erro
+      // vermelha deixaria a pessoa sem ação nenhuma.
+      if (data.precisaCadastro) {
+        router.push("/cadastro");
+        return;
+      }
+
       if (data.error) {
         setError(data.error);
         setLoading(false);
@@ -199,21 +188,25 @@ export default function PlanosPage() {
                 </div>
               )}
               <p className="font-bold">{p.nome}</p>
+              {/* Riscado e preço vêm da MESMA tabela do checkout. Antes eram números escritos
+                  à mão (59,40 e 118,80) que continuariam de pé mesmo depois de a promoção
+                  acabar no Play. A âncora segue sendo "o que custaria pagando mensal pelo
+                  mesmo período" — mesma semântica de antes, agora derivada. */}
               <p className="text-gray-500 text-sm line-through mt-1">
-                R$ {formatPrice(p.precoRegular)}
+                R$ {formatPrice(equivalenteMensal(p.id, 1))}
               </p>
               <p className="text-amber-500 font-bold text-2xl">
-                R$ {formatPrice(p.precoLancamento)}
+                R$ {formatPrice(precoTotal(p.id, 1))}
               </p>
               <p className="text-gray-500 text-xs">{p.periodo}</p>
-              {p.meses > 1 && (
+              {MESES[p.id] > 1 && (
                 <p className="text-gray-400 text-xs mt-1">
-                  R$ {formatPrice(p.precoLancamento / p.meses)}/mes
+                  R$ {formatPrice(precoTotal(p.id, 1) / MESES[p.id])}/mes
                 </p>
               )}
-              {p.economia && (
+              {economiaPeriodoPct(p.id, 1) > 0 && (
                 <p className="text-green-400 text-xs mt-1">
-                  Economia de {p.economia}
+                  Economia de {economiaPeriodoPct(p.id, 1)}%
                 </p>
               )}
               {p.bonus && (
@@ -233,7 +226,7 @@ export default function PlanosPage() {
 
           <div className="flex gap-2 mb-4">
             {[1, 3, 5, 10].map((qty) => {
-              const d = getDesconto(qty);
+              const d = descontoVolumePct(idPlano, qty) / 100;
               return (
                 <button
                   key={qty}
@@ -286,9 +279,9 @@ export default function PlanosPage() {
                 {quantidade} {quantidade === 1 ? "chave" : "chaves"} x{" "}
                 {plano.nome}
               </span>
-              {(economiaPeriodo > 0 || economiaVolume > 0) && (
+              {(economiaPeriodo > 0 || economiaVolumeValor > 0) && (
                 <span className="text-gray-500 text-sm line-through">
-                  R$ {formatPrice(equivalenteMensal)}
+                  R$ {formatPrice(equivalenteMensalTotal)}
                 </span>
               )}
             </div>
@@ -297,25 +290,25 @@ export default function PlanosPage() {
             {economiaPeriodo > 0 && (
               <div className="flex justify-between text-xs mt-2">
                 <span className="text-blue-400">
-                  Desconto {plano.nome.toLowerCase()} ({plano.economia})
+                  Desconto {plano.nome.toLowerCase()} ({economiaPeriodoPct(idPlano, quantidade)}%)
                 </span>
                 <span className="text-blue-400">
                   -R$ {formatPrice(economiaPeriodo)}
                 </span>
               </div>
             )}
-            {economiaVolume > 0 && (
+            {economiaVolumeValor > 0 && (
               <div className="flex justify-between text-xs mt-1">
                 <span className="text-green-400">
                   Desconto de volume ({Math.round(desconto * 100)}%)
                 </span>
                 <span className="text-green-400">
-                  -R$ {formatPrice(economiaVolume)}
+                  -R$ {formatPrice(economiaVolumeValor)}
                 </span>
               </div>
             )}
 
-            {(economiaPeriodo > 0 || economiaVolume > 0) && (
+            {(economiaPeriodo > 0 || economiaVolumeValor > 0) && (
               <div className="border-t border-gray-700 mt-3 pt-3" />
             )}
 
@@ -335,8 +328,8 @@ export default function PlanosPage() {
             {quantidade > 1 && (
               <p className="text-gray-500 text-xs mt-1 text-right">
                 R$ {formatPrice(precoUnitario)} por chave
-                {plano.meses > 1 && (
-                  <> · R$ {formatPrice(precoUnitario / plano.meses)}/mes por chave</>
+                {mesesNoPlano > 1 && (
+                  <> · R$ {formatPrice(precoUnitario / mesesNoPlano)}/mes por chave</>
                 )}
               </p>
             )}

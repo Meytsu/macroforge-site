@@ -121,13 +121,37 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Assinatura já morta (expirou ou foi revogada antes de chegar aqui).
-    if (assin.status === "cancelada") {
+    // ---------------------------------------------------------
+    // LISTA BRANCA: só 'ativa' concede. Tudo o mais recusa.
+    // ---------------------------------------------------------
+    // 🔴 CORRIGIDO EM 2026-08-10 (achado nº 3 da auditoria do Billing).
+    //
+    // Antes aqui havia `if (assin.status === "cancelada")` — uma lista NEGRA. Ela barrava
+    // `pendente` (acima) e `cancelada`, e deixava passar:
+    //
+    //     'suspensa'  = ON_HOLD / PAUSED  -> pagamento falhou ou o cliente pausou.
+    //                   O Google NÃO dá acesso nesses estados, e nós dávamos: chave ATIVA.
+    //     null        = o `default` de traduzirEstado, ou seja, qualquer estado que o Google
+    //                   inventar depois. Concedia também.
+    //
+    // O comentário do código dizia que o default era "conservador". Não era: default
+    // CONCEDIA. Lista negra envelhece contra você — todo estado novo entra permitido.
+    //
+    // Com lista branca, estado desconhecido passa a recusar, o cliente vê "avise o suporte" e
+    // VOCÊ descobre pelo log. Recusar indevidamente custa uma mensagem de suporte; conceder
+    // indevidamente custa uma licença paga que ninguém pagou.
+    if (assin.status !== "ativa") {
+      console.error(
+        `[play-verify] RECUSADO por status nao-ativo: ${assin.subscriptionState} ` +
+        `(traduzido: ${assin.status ?? "desconhecido"}) token=...${String(purchaseToken).slice(-8)}`
+      );
       return NextResponse.json(
         {
           ok: false,
-          erro: "Esta assinatura não está mais ativa.",
-          codigo: "assinatura_encerrada",
+          erro: assin.status === "suspensa"
+            ? "Sua assinatura está suspensa ou pausada. Regularize o pagamento no Google Play."
+            : "Esta assinatura não está mais ativa.",
+          codigo: assin.status === "suspensa" ? "assinatura_suspensa" : "assinatura_encerrada",
           subscriptionState: assin.subscriptionState,
         },
         { status: 400 }

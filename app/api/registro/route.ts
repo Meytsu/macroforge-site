@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { criarConfirmacao } from "@/app/api/_lib/confirmacao";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     // Verifica se e-mail já existe
     const checkRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}&select=id,senha_hash`,
+      `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}&select=id,senha_hash,email_confirmado`,
       { headers }
     );
     const existing = await checkRes.json();
@@ -131,7 +132,25 @@ export async function POST(req: NextRequest) {
           }),
         }
       );
-      return NextResponse.json({ ok: true, message: "Conta atualizada com sucesso" });
+      // Cliente que já existia: veio do /api/checkout ou do webhook, ou seja, PAGOU. Nesse
+      // caso `email_confirmado` já é true e não faz sentido pedir confirmação de quem
+      // provou existir pagando. Só pede se, por algum caminho, ainda estiver pendente.
+      if (existing[0].email_confirmado) {
+        return NextResponse.json({ ok: true, message: "Conta atualizada com sucesso" });
+      }
+
+      try {
+        const conf = await criarConfirmacao(existing[0].id, email, nome);
+        return NextResponse.json({
+          ok: true,
+          message: "Conta atualizada com sucesso",
+          pendencia: conf.pendencia,
+          emailEnviado: conf.emailEnviado,
+        });
+      } catch (e) {
+        console.error("Registro: falha ao criar confirmacao (cliente existente)", e);
+        return NextResponse.json({ ok: true, message: "Conta atualizada com sucesso", emailEnviado: false });
+      }
     }
 
     // Cria cliente novo
@@ -150,11 +169,39 @@ export async function POST(req: NextRequest) {
       }),
     });
 
-    if (res.ok) {
-      return NextResponse.json({ ok: true, message: "Conta criada com sucesso" });
-    } else {
+    if (!res.ok) {
       const err = await res.text();
       return NextResponse.json({ error: err }, { status: 500 });
+    }
+
+    // `email_confirmado` NÃO é enviado de propósito: a coluna tem DEFAULT false, então
+    // conta nascida aqui já nasce pendente. Mandar o campo explicitamente seria o jeito
+    // fácil de alguém, um dia, escrever `true` "pra destravar o teste" e desligar a
+    // defesa inteira sem perceber.
+    const criado = await res.json();
+    const clienteId = criado?.[0]?.id;
+
+    if (!clienteId) {
+      // Sem id não há como criar o convite. A conta existe, então NÃO devolvo erro (o
+      // usuário tentaria de novo e bateria em "e-mail já cadastrado"); devolvo ok sem
+      // pendência, e a tela cai no caminho de reenviar.
+      console.error("Registro: cliente criado mas sem id na resposta", criado);
+      return NextResponse.json({ ok: true, message: "Conta criada com sucesso", emailEnviado: false });
+    }
+
+    try {
+      const conf = await criarConfirmacao(clienteId, email, nome);
+      return NextResponse.json({
+        ok: true,
+        message: "Conta criada com sucesso",
+        pendencia: conf.pendencia,
+        emailEnviado: conf.emailEnviado,
+      });
+    } catch (e) {
+      // Mesmo raciocínio: a conta JÁ existe. Falhar aqui com 500 faria o usuário achar
+      // que o cadastro não foi, e a segunda tentativa seria recusada por e-mail duplicado.
+      console.error("Registro: falha ao criar confirmacao", e);
+      return NextResponse.json({ ok: true, message: "Conta criada com sucesso", emailEnviado: false });
     }
   } catch (error) {
     console.error("Erro no registro:", error);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Status do trial pro app decidir se MOSTRA o botão "Trial 7 dias" (MF-103).
+// Status do trial pro app decidir se MOSTRA o botão do trial (MF-103; hoje 7 dias — ver ativar-trial).
 // Responde { jaUsou } = true se o cliente OU o device já tiveram um trial.
 // (Espelha as travas 2 e 3 do /api/ativar-trial — so leitura, nao cria nada.)
 
