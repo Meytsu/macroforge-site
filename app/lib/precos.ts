@@ -45,40 +45,106 @@ export const NOME_PLANO: Record<PlanoId, string> = {
  */
 export const PROMO_LANCAMENTO_ATIVA = true;
 
-/** Preços do Play, em reais, por (plano, quantidade de chaves). Conferido em 2026-08-09. */
+/**
+ * Interruptor da VENDA PELO SITE (Mercado Pago). `false` = o site não cobra ninguém.
+ *
+ * 🔴 DESLIGADO EM 2026-08-10, decisão dele, na abertura do teste aberto.
+ *
+ * O motivo é que os dois canais de pagamento são **independentes** e estão em estados muito
+ * diferentes:
+ *
+ * ```
+ * app   -> Google Play Billing -> /api/play-purchase-verify   testado, 1ª compra funcionou
+ * site  -> Mercado Pago        -> /api/webhook                 0 vendas na história, 2 defeitos
+ * ```
+ *
+ * Os dois defeitos abertos do webhook (um pagamento virando N licenças, e cliente pagando sem
+ * receber chave porque a rota responde 200 e o Mercado Pago para de reenviar) nunca foram
+ * exercitados por dinheiro real. Deixar o botão de comprar exposto no site seria **risco sem
+ * upside**: o app dá conta da venda, e o site não precisa cobrar ninguém agora.
+ *
+ * ⚠️ NÃO basta esconder o link de `/planos`. A URL continuaria viva e um POST direto no
+ * `/api/checkout` continuaria criando preferência no Mercado Pago. Por isso o interruptor é
+ * checado nos DOIS lugares — a tela e a rota.
+ *
+ * Religar quando os dois defeitos do webhook estiverem corrigidos E houver uma compra real de
+ * ponta a ponta feita com sucesso.
+ */
+export const VENDA_PELO_SITE_ATIVA = false;
+
+/** Ficha do app na Play Store — pra onde mandar quem chega em /planos com a venda desligada. */
+export const URL_PLAY_STORE =
+  "https://play.google.com/store/apps/details?id=com.henrique.macroforge";
+
+/**
+ * Preços do Play, em reais, por (plano, quantidade de chaves).
+ *
+ * Conferido direto na API em **2026-08-10** com `scratchpad/auditar-precos-play.js`.
+ *
+ * 🔴 Os três valores de 5 chaves MUDARAM nesse dia (41,90 → 39,90 · 203,90 → 191,90 ·
+ * 339,90 → 319,90). Motivo: a escada de volume discordava entre os dois momentos —
+ * **15% na promoção contra 20% no regular** —, então o desconto mudava de forma no dia em que
+ * a oferta expirasse. Pior: a promoção era menos generosa justamente com quem compra mais
+ * (desconto total de 29,2% no anual de 5 chaves contra 33,4% no de 1).
+ *
+ * Decisão do Henrique: **10% em 3 chaves, 20% em 5**, nos dois momentos. Depois do ajuste as
+ * 6 escadas ficaram coerentes e o desconto total do lançamento ficou uniforme em ~33%.
+ */
 const TABELA: Record<PlanoId, Record<number, { regular: number; lancamento: number }>> = {
   mensal: {
     1: { regular: 14.9, lancamento: 9.9 },
     3: { regular: 39.9, lancamento: 26.9 },
-    5: { regular: 59.9, lancamento: 41.9 },
+    5: { regular: 59.9, lancamento: 39.9 },
   },
   semestral: {
     1: { regular: 72.9, lancamento: 47.9 },
     3: { regular: 196.9, lancamento: 128.9 },
-    5: { regular: 291.9, lancamento: 203.9 },
+    5: { regular: 291.9, lancamento: 191.9 },
   },
   anual: {
     1: { regular: 119.9, lancamento: 79.9 },
     3: { regular: 323.9, lancamento: 215.9 },
-    5: { regular: 479.9, lancamento: 339.9 },
+    5: { regular: 479.9, lancamento: 319.9 },
   },
 };
 
 /**
- * Quantidades acima de 5 são EXCLUSIVAS DO SITE — o Play só vende 1, 3 e 5.
+ * As ÚNICAS quantidades vendáveis — as mesmas três do app.
  *
- * Não dá pra copiar do Play o que não existe lá, então aqui vale a escada do
- * ADR-MF-XCROSS-012 (3 fixos + campo livre, teto de 30%), aplicada sobre o preço de UMA chave.
- * Abaixo de 10, o preço por chave vem da faixa da tabela imediatamente inferior — assim 1, 3 e
- * 5 batem no centavo com o Play, e o resto cresce sem degrau invertido.
+ * 🔴 ESPELHAMENTO DECIDIDO EM 2026-08-10, e isto **revoga o campo livre do
+ * ADR-MF-XCROSS-012** ("3 fixos + campo livre, teto 30%").
+ *
+ * Antes o site vendia de 1 a 25, com escada própria (25% em 10+, 30% em 20+) e faixas
+ * intermediárias herdando o preço por chave da faixa de baixo. O app vende só 1, 3 e 5.
+ *
+ * O que isso resolvia e o que custava:
+ *
+ * ```
+ * 19 chaves no anual   R$ 1.138,57
+ * 20 chaves no anual   R$ 1.118,59   <- MENOS por MAIS chaves
+ * ```
+ *
+ * Medido: o degrau invertido acontecia em **exatamente uma quantidade**, a 19 — matemática, não
+ * coincidência: com 25% até 19 e 30% a partir de 20, a inversão só existe acima de 18,67 chaves.
+ * O salto de 5 pontos valia R$ 79,90 no anual e a 20ª chave custava R$ 59,93.
+ *
+ * Dava pra remendar com uma trava de teto. Ele preferiu **espelhar o app**, e isso resolve mais
+ * do que o degrau: acabam os preços CALCULADOS. Sobram só os 9 valores da tabela do Play, e
+ * divergência entre canais deixa de ser possível porque não existe mais conta nenhuma.
+ *
+ * ⚠️ O que se perdeu: venda de 10 ou 20 chaves numa transação. Quem quiser 10 compra o pacote
+ * de 5 duas vezes (20% em cada, contra 25% numa só). Efeito colateral que ninguém havia notado:
+ * o campo livre já era uma vantagem que existia no site e NÃO existia no app.
  */
-const EXTRA_VOLUME: Array<{ min: number; desconto: number }> = [
-  { min: 20, desconto: 0.3 },
-  { min: 10, desconto: 0.25 },
-];
+export const QUANTIDADES = [1, 3, 5] as const;
+export type Quantidade = (typeof QUANTIDADES)[number];
 
-/** Teto de chaves numa compra pelo site. */
-export const MAX_CHAVES = 25;
+export function ehQuantidadeValida(v: unknown): v is Quantidade {
+  return v === 1 || v === 3 || v === 5;
+}
+
+/** Maior quantidade vendável. Mantido pelo nome antigo pra não quebrar quem importa. */
+export const MAX_CHAVES = 5;
 
 function valorTabela(plano: PlanoId, faixa: 1 | 3 | 5): number {
   const p = TABELA[plano][faixa];
@@ -92,36 +158,37 @@ function centavos(v: number): number {
 }
 
 /**
+ * Normaliza a quantidade para uma das três vendáveis.
+ *
+ * Cai para a MENOR faixa quando vem lixo, nunca para a maior: se um valor inesperado chegar,
+ * o pior caso é vender uma chave em vez de cinco — erro de menos, não de mais. O `/api/checkout`
+ * não depende disto: lá a quantidade inválida é **recusada**, não normalizada.
+ */
+function faixa(qtd: number): Quantidade {
+  const q = Math.floor(qtd);
+  return q >= 5 ? 5 : q >= 3 ? 3 : 1;
+}
+
+/**
  * Preço TOTAL da compra, em reais. É o número que o cliente vê e o número que ele paga —
  * a tela e o checkout chamam esta mesma função.
+ *
+ * Depois do espelhamento não há mais CONTA aqui: é consulta na tabela do Play. Foi assim que
+ * "o preço da tela difere do cobrado" deixou de ser um risco a administrar.
  */
 export function precoTotal(plano: PlanoId, qtd: number): number {
-  const q = Math.max(1, Math.min(MAX_CHAVES, Math.floor(qtd) || 1));
-
-  // 1, 3 e 5: valor EXATO do Play. Sem conta, sem arredondamento, sem divergência.
-  if (q === 1 || q === 3 || q === 5) return valorTabela(plano, q);
-
-  const extra = EXTRA_VOLUME.find(f => q >= f.min);
-  if (extra) {
-    // 10+ e 20+: escada do site, sobre o preço de uma chave.
-    return centavos(valorTabela(plano, 1) * q * (1 - extra.desconto));
-  }
-
-  // 2, 4, 6..9: usa o preço POR CHAVE da faixa imediatamente inferior. Garante que comprar
-  // uma chave a mais nunca fique mais barato que a faixa cheia logo abaixo.
-  const faixa: 1 | 3 | 5 = q >= 6 ? 5 : q >= 4 ? 3 : 1;
-  return centavos((valorTabela(plano, faixa) / faixa) * q);
+  return valorTabela(plano, faixa(qtd));
 }
 
 /** Preço por chave, só para exibição. Nunca use isto para cobrar — cobre `precoTotal`. */
 export function precoPorChave(plano: PlanoId, qtd: number): number {
-  const q = Math.max(1, Math.min(MAX_CHAVES, Math.floor(qtd) || 1));
+  const q = faixa(qtd);
   return centavos(precoTotal(plano, q) / q);
 }
 
 /** Quanto o cliente economiza no volume: N chaves avulsas menos o preço real da compra. */
 export function economiaVolume(plano: PlanoId, qtd: number): number {
-  const q = Math.max(1, Math.min(MAX_CHAVES, Math.floor(qtd) || 1));
+  const q = faixa(qtd);
   return centavos(valorTabela(plano, 1) * q - precoTotal(plano, q));
 }
 
@@ -133,7 +200,7 @@ export function economiaVolume(plano: PlanoId, qtd: number): number {
  * FLOOR de propósito: nunca anunciar desconto maior que o real (CDC art. 37).
  */
 export function descontoVolumePct(plano: PlanoId, qtd: number): number {
-  const q = Math.max(1, Math.min(MAX_CHAVES, Math.floor(qtd) || 1));
+  const q = faixa(qtd);
   const cheio = valorTabela(plano, 1) * q;
   if (cheio <= 0) return 0;
   return Math.floor((1 - precoTotal(plano, q) / cheio) * 100);

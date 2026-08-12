@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   precoTotal, precoPorChave, economiaVolume, descontoVolumePct,
-  equivalenteMensal, economiaPeriodoPct, MESES, MAX_CHAVES, ehPlanoValido,
+  equivalenteMensal, economiaPeriodoPct, MESES, QUANTIDADES, ehPlanoValido,
+  VENDA_PELO_SITE_ATIVA, URL_PLAY_STORE,
   type PlanoId,
 } from "@/app/lib/precos";
 
@@ -21,8 +22,8 @@ const PLANOS: Array<{
   { id: "anual",     nome: "Anual",     periodo: "/ano", melhorValor: true, bonus: "4 meses gratis" },
 ];
 
-// MAX_CHAVES e a escada de desconto saíram daqui — vêm de `app/lib/precos.ts`, junto com os
-// preços. Duplicar o teto em dois arquivos é como o site acabou com duas tabelas divergentes.
+// As quantidades e a escada de desconto vêm de `app/lib/precos.ts`, junto com os preços.
+// Duplicar isso em dois arquivos foi como o site acabou com duas tabelas divergentes.
 
 function formatPrice(value: number): string {
   return value.toFixed(2).replace(".", ",");
@@ -32,7 +33,6 @@ export default function PlanosPage() {
   const router = useRouter();
   const [planoId, setPlanoId] = useState("mensal");
   const [quantidade, setQuantidade] = useState(1);
-  const [customQty, setCustomQty] = useState("");
   const [email, setEmail] = useState("");
   const [emailConfirmado, setEmailConfirmado] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -80,21 +80,6 @@ export default function PlanosPage() {
   // Total economizado
   const economiaTotal = economiaPeriodo + economiaVolumeValor;
 
-  function handleQtyButton(qty: number) {
-    setQuantidade(qty);
-    setCustomQty("");
-  }
-
-  function handleCustomQty(value: string) {
-    setCustomQty(value);
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 1 && num <= MAX_CHAVES) {
-      setQuantidade(num);
-    } else if (value === "") {
-      setQuantidade(1);
-    }
-  }
-
   async function handleComprar() {
     if (!email || !email.includes("@")) {
       setError("Digite um e-mail valido");
@@ -139,6 +124,51 @@ export default function PlanosPage() {
       setError("Erro ao conectar. Tente novamente.");
       setLoading(false);
     }
+  }
+
+  // VENDA PELO SITE DESLIGADA (2026-08-10). A tela nao sai do ar: explica e manda pro app.
+  //
+  // Preferido a esconder o link porque link escondido deixa a URL viva — e ha 5 lugares
+  // apontando pra ca (landing, faq, painel x2, CheckoutButton). Uma pagina que explica e melhor
+  // que 5 links removidos e um 404, e e UM lugar pra reverter.
+  //
+  // A recusa de verdade esta no /api/checkout: esta tela e conveniencia, nao trava.
+  if (!VENDA_PELO_SITE_ATIVA) {
+    return (
+      <main className="min-h-screen bg-[#0D1117] text-white pt-20 px-4 pb-12">
+        <div className="max-w-md mx-auto text-center">
+          <Image src="/icon.png" alt="MacroForge" width={64} height={64} className="mx-auto mb-6" />
+          <h1 className="text-2xl font-bold mb-3">Assine pelo aplicativo</h1>
+          <p className="text-gray-400 text-sm mb-6">
+            As assinaturas do MacroForge sao feitas dentro do app, pela Google Play. E mais
+            rapido, e voce gerencia tudo direto na sua conta Google.
+          </p>
+
+          <div className="bg-[#161B22] border border-gray-800 rounded-xl p-5 mb-6 text-left">
+            <p className="text-sm text-gray-300 mb-3 font-semibold">Como assinar</p>
+            <ol className="text-sm text-gray-400 space-y-2 list-decimal list-inside">
+              <li>Instale o MacroForge pela Google Play</li>
+              <li>Entre com a mesma conta que voce usa aqui</li>
+              <li>Abra <span className="text-white">Planos</span> dentro do app</li>
+            </ol>
+          </div>
+
+          <a
+            href={URL_PLAY_STORE}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block w-full py-3 rounded-xl font-bold bg-amber-500 hover:bg-amber-600 text-black transition-colors"
+          >
+            Abrir na Google Play
+          </a>
+
+          <p className="text-gray-500 text-xs mt-6">
+            Ja tem uma chave? Ela continua funcionando normalmente.{" "}
+            <a href="/painel" className="text-amber-500 hover:underline">Ver minhas licencas</a>
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -224,52 +254,30 @@ export default function PlanosPage() {
             Quantidade de chaves
           </h2>
 
+          {/* ESPELHANDO O APP (2026-08-10). Antes havia o botao de 10 e um CAMPO LIVRE de 1
+              a 25, com escada propria do site (25% em 10+, 30% em 20+) — quantidades que o app
+              nao vende. Agora sao as tres mesmas dos dois lados, e o preco vem da tabela do Play
+              sem nenhuma conta. Revoga o campo livre do ADR-MF-XCROSS-012. */}
           <div className="flex gap-2 mb-4">
-            {[1, 3, 5, 10].map((qty) => {
-              const d = descontoVolumePct(idPlano, qty) / 100;
+            {QUANTIDADES.map((qty) => {
+              const d = descontoVolumePct(idPlano, qty);
               return (
                 <button
                   key={qty}
-                  onClick={() => handleQtyButton(qty)}
+                  onClick={() => setQuantidade(qty)}
                   className={`flex-1 py-3 rounded-lg border text-center transition-all ${
-                    quantidade === qty && customQty === ""
+                    quantidade === qty
                       ? "border-amber-500 bg-amber-500/10 text-amber-400"
                       : "border-gray-700 bg-[#0D1117] text-gray-400 hover:border-gray-500"
                   }`}
                 >
                   <span className="block font-bold text-lg">{qty}</span>
                   <span className={`block text-xs ${d > 0 ? "text-green-400" : "text-gray-600"}`}>
-                    {d > 0 ? `-${Math.round(d * 100)}%` : "—"}
+                    {d > 0 ? `-${d}%` : "—"}
                   </span>
                 </button>
               );
             })}
-
-            {/* Campo personalizado inline */}
-            <div
-              className={`flex-1 rounded-lg border text-center transition-all flex flex-col items-center justify-center py-2 ${
-                customQty !== ""
-                  ? "border-amber-500 bg-amber-500/10"
-                  : "border-gray-700 bg-[#0D1117]"
-              }`}
-            >
-              <input
-                type="number"
-                min={1}
-                max={MAX_CHAVES}
-                value={customQty}
-                onChange={(e) => handleCustomQty(e.target.value)}
-                placeholder="Qtd"
-                className="w-14 bg-transparent text-white text-lg font-bold text-center focus:outline-none placeholder-gray-600"
-              />
-              <span className={`block text-xs ${customQty !== "" && desconto > 0 ? "text-green-400" : "text-gray-600"}`}>
-                {customQty !== ""
-                  ? desconto > 0
-                    ? `-${Math.round(desconto * 100)}%`
-                    : "0%"
-                  : "%"}
-              </span>
-            </div>
           </div>
 
           {/* Resumo do preco */}

@@ -10,13 +10,32 @@ import { MercadoPagoConfig, Preference } from "mercadopago";
 // (mensal x5: Play 41,90, site 42,10 · semestral x3: Play 128,90, site 129,33).
 //
 // Não adicione preço aqui de novo. Preço é dado, e mora num lugar só.
-import { precoTotal, NOME_PLANO, MAX_CHAVES, ehPlanoValido } from "@/app/lib/precos";
+import {
+  precoTotal, NOME_PLANO, ehPlanoValido, ehQuantidadeValida, QUANTIDADES,
+  VENDA_PELO_SITE_ATIVA, URL_PLAY_STORE,
+} from "@/app/lib/precos";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 
 export async function POST(req: NextRequest) {
   try {
+    // VENDA PELO SITE DESLIGADA (2026-08-10). Checado ANTES de qualquer coisa — antes de ler o
+    // corpo, antes de falar com o Mercado Pago, antes de tocar no banco.
+    //
+    // Esconder o link de /planos não bastaria: a URL continuaria viva e um POST direto aqui
+    // criaria preferência de pagamento. O interruptor mora em `lib/precos.ts` e vale pros dois.
+    if (!VENDA_PELO_SITE_ATIVA) {
+      return NextResponse.json(
+        {
+          error: "As assinaturas estao disponiveis pelo aplicativo na Google Play.",
+          vendaDesativada: true,
+          urlApp: URL_PLAY_STORE,
+        },
+        { status: 503 }
+      );
+    }
+
     const accessToken = process.env.MP_ACCESS_TOKEN;
     if (!accessToken) {
       return NextResponse.json({ error: "Token do MP nao configurado" }, { status: 500 });
@@ -24,7 +43,18 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { plano, email, nome, whatsapp, pais, estado, cidade, codigo_pais } = body;
-    const quantidade = Math.max(1, Math.min(MAX_CHAVES, parseInt(body.quantidade, 10) || 1));
+    // RECUSA em vez de normalizar (espelhamento de 2026-08-10). Antes era
+    // `Math.max(1, Math.min(25, ...))`, que ACEITAVA qualquer número e o encaixava numa faixa.
+    // Com só três quantidades vendáveis, encaixar seria escolher um preço no lugar do cliente:
+    // um POST com `quantidade: 7` viraria cobrança de 5 chaves entregando 7, ou o contrário.
+    // Recusar é a única resposta honesta, e é barato — a tela só oferece 1, 3 e 5.
+    const quantidade = parseInt(body.quantidade, 10);
+    if (!ehQuantidadeValida(quantidade)) {
+      return NextResponse.json(
+        { error: `Quantidade invalida. Escolha ${QUANTIDADES.join(", ")} chaves.` },
+        { status: 400 }
+      );
+    }
 
     if (!ehPlanoValido(plano)) {
       return NextResponse.json({ error: "Plano invalido" }, { status: 400 });
