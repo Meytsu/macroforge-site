@@ -23,12 +23,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 
 /**
- * Janela de busca. 48 h e não 24 h de propósito: o cron da Vercel no plano Hobby tem
- * precisão de ±59 min, pode PULAR uma execução (a entrega é "best effort", documentado) e
- * pode invocar duas vezes. A sobreposição cobre o pulo; o dedupe por `evento_id` cobre a
- * duplicata. Uma janela justa de 24 h perderia reembolso a cada execução falhada.
+ * Janela de busca: 7 dias (era 48 h até 2026-10-12). O cron da Vercel no plano Hobby tem
+ * precisão de ±59 min, pode PULAR execuções (a entrega é "best effort", documentado) e pode
+ * invocar duas vezes. Uma semana de sobreposição cobre vários pulos seguidos; repetir é seguro
+ * (o dedupe por `evento_id` nas assinaturas e o `mudou` das DGs). O Google guarda 30 dias.
  */
-const HORAS_JANELA = 48;
+const HORAS_JANELA = 7 * 24;
 
 async function rpc(fn: string, args: Record<string, unknown>) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
     const anuladas = await listarComprasAnuladas(desde);
 
     const cortadas: string[] = [];
+    let repetidas = 0;   // já cortadas numa execução anterior (a janela se sobrepõe de propósito)
     const parciais: string[] = [];
     const falhas: string[] = [];
 
@@ -103,8 +104,10 @@ export async function GET(request: NextRequest) {
       // Compra AVULSA de DG (Macros Forjados, sql/12)? O token é de `compras_dg`, não de assinatura: tira a DG da
       // conta e segue. Falha aqui não impede o caminho das assinaturas logo abaixo.
       try {
+        // Desconhecida (encontrada=false) fica anotada no banco e nunca vira DG depois (sql/12 v3).
         const dg = await rpc("mf_anular_compra_dg", { p_purchase_token: a.purchaseToken });
         if (dg?.encontrada === true) {
+          if (dg?.mudou === false) { repetidas++; continue; }
           cortadas.push(`dg ${etiqueta}`);
           console.log(`[play-anuladas] DG CORTADA ${etiqueta}`);
           continue;
@@ -140,6 +143,7 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
+        if (r?.duplicado === true) { repetidas++; continue; }
         cortadas.push(etiqueta);
         console.log(`[play-anuladas] CORTADO ${etiqueta}`);
       } catch (e) {
@@ -153,7 +157,7 @@ export async function GET(request: NextRequest) {
     // diferente de "não rodou".
     console.log(
       `[play-anuladas] ${simular ? "SIMULACAO" : "REAL"} — janela ${HORAS_JANELA}h · ` +
-      `${anuladas.length} anulacao(oes) · ${cortadas.length} cortada(s) · ` +
+      `${anuladas.length} anulacao(oes) · ${cortadas.length} cortada(s) · ${repetidas} ja cortada(s) antes · ` +
       `${parciais.length} parcial(is) ignorada(s) · ${falhas.length} falha(s)`
     );
 
@@ -163,6 +167,7 @@ export async function GET(request: NextRequest) {
       janelaHoras: HORAS_JANELA,
       encontradas: anuladas.length,
       cortadas,
+      jaCortadasAntes: repetidas,
       parciaisIgnoradas: parciais,
       falhas,
     });

@@ -393,6 +393,8 @@ export async function consultarCompraAvulsa(productId: string, purchaseToken: st
     throw new Error(`products.get falhou: ${res.status} ${txt.slice(0, 300)}`);
   }
   const d = await res.json();
+  // Defesa extra: o Google já recusa token de outro produto (400), mas se a resposta disser outro produto, não vale.
+  if (typeof d.productId === "string" && d.productId !== productId) return null;
   return {
     estado: Number(d.purchaseState ?? -1),
     orderId: typeof d.orderId === "string" ? d.orderId : null,
@@ -476,20 +478,28 @@ export interface CompraAnulada {
  */
 export async function listarComprasAnuladas(desde: Date): Promise<CompraAnulada[]> {
   const token = await getAccessToken();
-  const url =
-    `${BASE_API}/applications/${PACKAGE_NAME}/purchases/voidedpurchases` +
-    `?startTime=${desde.getTime()}&type=1`; // type=1 inclui assinaturas
+  const lista: Record<string, unknown>[] = [];
+  // Paginado: o Google devolve até 1000 por página e um `nextPageToken` quando há mais (antes só a 1ª página era lida).
+  let pagina: string | null = null;
+  for (let i = 0; i < 20; i++) {
+    const url: string =
+      `${BASE_API}/applications/${PACKAGE_NAME}/purchases/voidedpurchases` +
+      `?startTime=${desde.getTime()}&type=1&maxResults=1000` + // type=1 inclui assinaturas
+      (pagina ? `&token=${encodeURIComponent(pagina)}` : "");
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`voidedpurchases.list falhou: ${res.status} ${txt.slice(0, 300)}`);
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`voidedpurchases.list falhou: ${res.status} ${txt.slice(0, 300)}`);
+    }
+    const d = await res.json();
+    if (Array.isArray(d.voidedPurchases)) lista.push(...d.voidedPurchases);
+    pagina = typeof d.tokenPagination?.nextPageToken === "string" ? d.tokenPagination.nextPageToken : null;
+    if (!pagina) break;
   }
-  const d = await res.json();
-  const lista = Array.isArray(d.voidedPurchases) ? d.voidedPurchases : [];
 
   return lista.map((v: Record<string, unknown>) => {
     const motivo = Number(v.voidedReason ?? 0);

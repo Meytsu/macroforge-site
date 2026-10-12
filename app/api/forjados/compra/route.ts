@@ -2,7 +2,7 @@
 // Corpo: { purchaseToken, productId }   ·   Header: Authorization: Bearer <crachá>
 // Respostas: { ok:true, dg_id, novo }      → o app CONFIRMA a compra (acknowledge, sem consumir) e baixa a DG
 //            { ok:true, pendente:true }    → boleto/lotérica: nada concedido ainda (NÃO confirmar)
-//            { ok:false, codigo, erro }    → recusada
+//            { ok:false, codigo, erro }    → recusada (HTTP 429 + codigo muitos_pedidos: passou do limite da conta)
 // Mesmas regras do play-purchase-verify: o cliente sai do CRACHÁ (nunca do corpo), o que foi comprado e se foi pago
 // vêm do GOOGLE, e quem confirma a compra é o app, só DEPOIS de esta rota conceder (falha aqui = o Google reembolsa
 // sozinho em 3 dias, em vez de o cliente pagar e ficar sem a DG).
@@ -24,6 +24,13 @@ export async function POST(req: NextRequest) {
     const purchaseToken = typeof body.purchaseToken === "string" ? body.purchaseToken.trim() : "";
     if (!/^dg_[a-z0-9_]{1,40}$/.test(productId)) return recusa("Produto inválido", "produto_invalido");
     if (!purchaseToken || purchaseToken.length > 4096) return recusa("Comprovante inválido", "sem_token");
+
+    // Limite por conta ANTES de consultar o Google (a cota da API é a mesma das assinaturas) — sql/12 v3.
+    const lim = await rpc("mf_forjados_limite", { p_cliente_id: clienteId, p_tipo: "compra" });
+    if (!lim?.ok) {
+      if (lim?.codigo === "conta_inexistente") return semCracha();
+      return recusa(lim?.erro ?? "Muitos pedidos seguidos.", lim?.codigo ?? "muitos_pedidos", 429);
+    }
 
     const compra = await consultarCompraAvulsa(productId, purchaseToken);
     if (!compra) return recusa("Comprovante de compra inválido.", "token_desconhecido");
