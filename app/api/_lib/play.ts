@@ -385,7 +385,9 @@ export async function consultarCompraAvulsa(productId: string, purchaseToken: st
     `${BASE_API}/applications/${PACKAGE_NAME}/purchases/products/` +
     `${encodeURIComponent(productId)}/tokens/${encodeURIComponent(purchaseToken)}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-  if (res.status === 404 || res.status === 410) return null;
+  // 400 = token malformado ou de outro produto (o Google responde "Invalid Value"): comprovante que não existe, não
+  // falha do servidor.
+  if (res.status === 400 || res.status === 404 || res.status === 410) return null;
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(`products.get falhou: ${res.status} ${txt.slice(0, 300)}`);
