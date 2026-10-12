@@ -359,6 +359,48 @@ export function decomporBasePlanId(basePlanId: string): PlanoDecomposto | null {
 }
 
 // ------------------------------------------------------------
+// Compra AVULSA (produto de compra única) — Macros Forjados, uma DG por produto (ADR-MF-XCROSS-020)
+// ------------------------------------------------------------
+
+export interface CompraAvulsa {
+  /** 0 = comprada · 1 = cancelada · 2 = pendente (boleto/lotérica). */
+  estado: number;
+  orderId: string | null;
+  /** Já confirmada pelo app (acknowledge)? */
+  confirmada: boolean;
+  /** Hash da conta MacroForge que o app mandou na compra (setObfuscatedAccountId). */
+  contaOfuscada: string | null;
+  ehTeste: boolean;
+}
+
+/**
+ * Pergunta ao Google o que é esta compra avulsa (`purchases.products.get`).
+ *
+ * @returns `null` quando o Google diz que o token não existe para este produto (404/410).
+ * @throws  em falha de rede/permissão — o chamador responde 5xx e NUNCA concede.
+ */
+export async function consultarCompraAvulsa(productId: string, purchaseToken: string): Promise<CompraAvulsa | null> {
+  const token = await getAccessToken();
+  const url =
+    `${BASE_API}/applications/${PACKAGE_NAME}/purchases/products/` +
+    `${encodeURIComponent(productId)}/tokens/${encodeURIComponent(purchaseToken)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+  if (res.status === 404 || res.status === 410) return null;
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`products.get falhou: ${res.status} ${txt.slice(0, 300)}`);
+  }
+  const d = await res.json();
+  return {
+    estado: Number(d.purchaseState ?? -1),
+    orderId: typeof d.orderId === "string" ? d.orderId : null,
+    confirmada: Number(d.acknowledgementState ?? 0) === 1,
+    contaOfuscada: typeof d.obfuscatedExternalAccountId === "string" ? d.obfuscatedExternalAccountId : null,
+    ehTeste: Number(d.purchaseType ?? -1) === 0,
+  };
+}
+
+// ------------------------------------------------------------
 // Compras anuladas (reembolso / chargeback)
 // ------------------------------------------------------------
 

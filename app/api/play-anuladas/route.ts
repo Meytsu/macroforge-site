@@ -100,6 +100,19 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // Compra AVULSA de DG (Macros Forjados, sql/12)? O token é de `compras_dg`, não de assinatura: tira a DG da
+      // conta e segue. Falha aqui não impede o caminho das assinaturas logo abaixo.
+      try {
+        const dg = await rpc("mf_anular_compra_dg", { p_purchase_token: a.purchaseToken });
+        if (dg?.encontrada === true) {
+          cortadas.push(`dg ${etiqueta}`);
+          console.log(`[play-anuladas] DG CORTADA ${etiqueta}`);
+          continue;
+        }
+      } catch (e) {
+        console.error(`[play-anuladas] falha ao conferir compra de DG ${etiqueta}:`, e);
+      }
+
       try {
         // `evento_id` DETERMINÍSTICO a partir do orderId: rodar de novo bate na chave
         // primária de `play_eventos` e não faz nada duas vezes. É o que torna esta rota
