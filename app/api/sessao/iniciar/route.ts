@@ -10,7 +10,7 @@ import { aparelhoInvalido, falha, lerAparelho, lerApelido, lerPedido, respostaDo
 
 export async function POST(req: NextRequest) {
   try {
-    const { clienteId, body, crachaNovo } = await lerPedido(req);
+    const { clienteId, body, crachaNovo } = await lerPedido(req, { renovar: true });
     if (!clienteId) return semCracha();
     const device = lerAparelho(body.device_id);
     if (!device) return aparelhoInvalido();

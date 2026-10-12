@@ -29,8 +29,11 @@ function getSecret(): Uint8Array {
  * Emite um crachá pro cliente. Guarda o id (e o email só pra conveniência/log).
  * Expira em {@link VALIDADE_DIAS} dias.
  */
-export async function emitirCracha(clienteId: string, email: string): Promise<string> {
-  return await new SignJWT({ email })
+export async function emitirCracha(clienteId: string, email: string, loginEm?: number): Promise<string> {
+  // `lat` = quando a pessoa digitou a senha (login). A renovação automática copia esse valor e para de renovar
+  // depois de 90 dias dele — um crachá roubado não vira acesso eterno.
+  const lat = loginEm ?? Math.floor(Date.now() / 1000);
+  return await new SignJWT({ email, lat })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(clienteId) // o "dono" do crachá = clienteId (lido depois via .sub)
     .setIssuedAt()
@@ -72,6 +75,8 @@ export interface CrachaDoHeader {
   clienteId: string;
   email?: string;
   emitidoEm?: number;
+  /** Quando foi o login com senha que originou este crachá (renovações copiam). Crachá antigo: undefined. */
+  loginEm?: number;
 }
 
 /** Como {@link clienteIdDoHeader}, mas devolve também e-mail e data de emissão (pra renovar o crachá em uso). */
@@ -87,6 +92,7 @@ export async function crachaDoHeader(authHeader: string | null): Promise<CrachaD
       clienteId: payload.sub,
       email: typeof payload.email === "string" ? payload.email : undefined,
       emitidoEm: typeof payload.iat === "number" ? payload.iat : undefined,
+      loginEm: typeof payload.lat === "number" ? payload.lat : undefined,
     };
   } catch {
     return null;
