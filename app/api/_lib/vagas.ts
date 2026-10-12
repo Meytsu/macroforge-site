@@ -16,7 +16,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { clienteIdDoHeader } from "@/app/api/_lib/auth";
+import { crachaDoHeader, emitirCracha } from "@/app/api/_lib/auth";
 import { rpc } from "@/app/api/_lib/rpc";
 
 export { rpc };
@@ -41,10 +41,19 @@ export function aparelhoInvalido() {
  * Repassa a resposta do banco. Exceção: `conta_inexistente` (o crachá vale 30 dias, mas a conta pode ter sido
  * apagada nesse meio-tempo — ex.: faxina de não confirmados) vira 401, pra o app pedir login de novo.
  */
-export function respostaDoBanco(r: unknown) {
+export function respostaDoBanco(r: unknown, crachaNovo?: string | null) {
   if (r && typeof r === "object" && (r as { codigo?: unknown }).codigo === "conta_inexistente") return semCracha();
+  if (crachaNovo && r && typeof r === "object" && !Array.isArray(r)) {
+    return NextResponse.json({ ...(r as Record<string, unknown>), cracha_novo: crachaNovo });
+  }
   return NextResponse.json(r);
 }
+
+/**
+ * Crachá com mais de 7 dias é RENOVADO na vaga/sinal de vida (devolvido em `cracha_novo`): quem usa o app não
+ * cai pro login a cada 30 dias no meio de um macro. Quem fica 30 dias sem abrir o overlay entra de novo.
+ */
+const RENOVAR_CRACHA_APOS_S = 7 * 24 * 60 * 60;
 
 /** 500 padrão: o app tenta de novo depois (a vaga continua valendo até vencer). */
 export function falha(rota: string, e: unknown) {
@@ -80,9 +89,21 @@ export function lerApelido(valor: unknown): string | null {
   return a.length > 0 ? a : null;
 }
 
-/** Cliente do crachá + corpo JSON (vazio se não vier). */
-export async function lerPedido(req: NextRequest): Promise<{ clienteId: string | null; body: Record<string, unknown> }> {
-  const clienteId = await clienteIdDoHeader(req.headers.get("authorization"));
+/** Cliente do crachá + corpo JSON (vazio se não vier) + crachá renovado (quando o atual já passou de 7 dias). */
+export async function lerPedido(req: NextRequest): Promise<{
+  clienteId: string | null;
+  body: Record<string, unknown>;
+  crachaNovo: string | null;
+}> {
+  const c = await crachaDoHeader(req.headers.get("authorization"));
   const body = req.method === "GET" ? {} : await req.json().catch(() => ({}));
-  return { clienteId, body: body && typeof body === "object" ? (body as Record<string, unknown>) : {} };
+  let crachaNovo: string | null = null;
+  if (c && c.emitidoEm && Date.now() / 1000 - c.emitidoEm > RENOVAR_CRACHA_APOS_S) {
+    crachaNovo = await emitirCracha(c.clienteId, c.email ?? "");
+  }
+  return {
+    clienteId: c ? c.clienteId : null,
+    body: body && typeof body === "object" ? (body as Record<string, unknown>) : {},
+    crachaNovo,
+  };
 }

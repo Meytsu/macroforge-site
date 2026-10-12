@@ -63,13 +63,31 @@ export async function verificarCracha(token: string): Promise<CrachaVerificado> 
  * segredo viraria "sessão expirada" pra todo mundo, e cada app ficaria num ciclo de login.
  */
 export async function clienteIdDoHeader(authHeader: string | null): Promise<string | null> {
+  const c = await crachaDoHeader(authHeader);
+  return c ? c.clienteId : null;
+}
+
+/** Crachá conferido: de quem é, e-mail (conveniência) e quando foi emitido (segundos, `iat`). */
+export interface CrachaDoHeader {
+  clienteId: string;
+  email?: string;
+  emitidoEm?: number;
+}
+
+/** Como {@link clienteIdDoHeader}, mas devolve também e-mail e data de emissão (pra renovar o crachá em uso). */
+export async function crachaDoHeader(authHeader: string | null): Promise<CrachaDoHeader | null> {
   if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
   const token = authHeader.slice("Bearer ".length).trim();
   if (!token) return null;
   const segredo = getSecret(); // fora do try de propósito (ver acima)
   try {
     const { payload } = await jwtVerify(token, segredo, { algorithms: ["HS256"] });
-    return payload.sub ? payload.sub : null;
+    if (!payload.sub) return null;
+    return {
+      clienteId: payload.sub,
+      email: typeof payload.email === "string" ? payload.email : undefined,
+      emitidoEm: typeof payload.iat === "number" ? payload.iat : undefined,
+    };
   } catch {
     return null;
   }

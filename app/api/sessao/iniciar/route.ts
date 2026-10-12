@@ -4,12 +4,13 @@
 //                       { ok:false, codigo:"limite", aparelhos:[...] }  → o app mostra a lista e o "Desconectar"
 //                       { ok:false, codigo:"sem_plano" }                → o app manda pra tela de planos
 // HTTP 401 = crachá inválido OU conta apagada (login de novo) · 400 = aparelho inválido · 500 = tente de novo
+// `cracha_novo` (opcional): crachá renovado — o app guarda no lugar do atual.
 import { NextRequest } from "next/server";
 import { aparelhoInvalido, falha, lerAparelho, lerApelido, lerPedido, respostaDoBanco, rpc, semCracha } from "@/app/api/_lib/vagas";
 
 export async function POST(req: NextRequest) {
   try {
-    const { clienteId, body } = await lerPedido(req);
+    const { clienteId, body, crachaNovo } = await lerPedido(req);
     if (!clienteId) return semCracha();
     const device = lerAparelho(body.device_id);
     if (!device) return aparelhoInvalido();
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
       p_device_id: device,
       p_apelido: lerApelido(body.apelido),
     });
-    return respostaDoBanco(r);
+    return respostaDoBanco(r, crachaNovo);
   } catch (e) {
     return falha("sessao/iniciar", e);
   }

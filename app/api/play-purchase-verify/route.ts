@@ -219,6 +219,8 @@ export async function POST(req: NextRequest) {
       // ADR-021: o plano da assinatura (o app novo mostra "Pro · 3 aparelhos"; o antigo ignora estes campos)
       nivel: r.nivel ?? p.tier,
       limite: r.limite ?? p.qtdChaves,
+      // Duração do plano comprado (mensal/semestral/anual): o app compara com ela em "Este já é o seu plano".
+      duracao: p.plano,
       data_expiracao: r.data_expiracao ?? assin.expiryTime,
       // Útil no teste: distingue compra de testador de licença de compra real.
       teste: assin.ehTeste,

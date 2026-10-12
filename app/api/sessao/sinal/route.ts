@@ -11,12 +11,12 @@ import { aparelhoInvalido, falha, lerAparelho, lerPedido, respostaDoBanco, rpc, 
 
 export async function POST(req: NextRequest) {
   try {
-    const { clienteId, body } = await lerPedido(req);
+    const { clienteId, body, crachaNovo } = await lerPedido(req);
     if (!clienteId) return semCracha();
     const device = lerAparelho(body.device_id);
     if (!device) return aparelhoInvalido();
     const r = await rpc("mf_renovar_sessao", { p_cliente_id: clienteId, p_device_id: device });
-    return respostaDoBanco(r);
+    return respostaDoBanco(r, crachaNovo);
   } catch (e) {
     return falha("sessao/sinal", e);
   }
