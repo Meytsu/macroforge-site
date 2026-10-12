@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { clienteIdDoHeader } from "@/app/api/_lib/auth";
+import { lerAparelho } from "@/app/api/_lib/vagas";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
@@ -58,7 +59,8 @@ export async function POST(req: NextRequest) {
   try {
     const corpo = await req.json().catch(() => ({}));
     const emailCorpo = typeof corpo?.email === "string" ? corpo.email.trim() : "";
-    const device_id = typeof corpo?.device_id === "string" ? corpo.device_id.trim() : "";
+    // Mesma regra das vagas (sem caractere de controle/emoji, até 128) — evita 500 do banco por lixo na entrada.
+    const device_id = lerAparelho(corpo?.device_id) ?? "";
 
     // QUEM pede o trial. App novo (ADR-021): manda o CRACHÁ do login e o cliente sai DELE — o e-mail do corpo é
     // ignorado, então ninguém ativa o trial de outra pessoa só sabendo o e-mail dela (achado do pentest de
@@ -92,6 +94,13 @@ export async function POST(req: NextRequest) {
     const clientes = await lerLista<{ id: string; email: string; email_confirmado?: boolean }>(clienteRes, "clientes");
 
     if (clientes.length === 0) {
+      // Com crachá: a conta foi apagada depois do login (ex.: faxina) → entrar de novo, igual às rotas de vaga.
+      if (clienteIdCracha) {
+        return NextResponse.json(
+          { error: "Sessao expirada. Faca login novamente.", codigo: "sem_cracha" },
+          { status: 401 }
+        );
+      }
       return NextResponse.json({ error: "Conta nao encontrada. Cadastre-se primeiro." }, { status: 404 });
     }
 
@@ -150,16 +159,15 @@ export async function POST(req: NextRequest) {
 
     // 4. Verifica se esse cliente ja tem licenca ativa (paga)
     const licAtiva = await fetch(
-      `${SUPABASE_URL}/rest/v1/licencas?cliente_id=eq.${cliente.id}&status=eq.ativa&data_expiracao=gt.${new Date().toISOString()}&select=id,chave`,
+      `${SUPABASE_URL}/rest/v1/licencas?cliente_id=eq.${cliente.id}&status=eq.ativa&data_expiracao=gt.${new Date().toISOString()}&select=id`,
       { headers }
     );
-    const ativas = await lerLista<{ chave: string }>(licAtiva, "licencas ativas");
+    const ativas = await lerLista(licAtiva, "licencas ativas");
 
     if (ativas.length > 0) {
-      return NextResponse.json(
-        { error: "Voce ja possui uma licenca ativa.", chave: ativas[0].chave },
-        { status: 409 }
-      );
+      // Sem devolver a chave: no caminho antigo (só e-mail) isso entregava a chave paga de outra pessoa.
+      // O app antigo só lê `error` aqui.
+      return NextResponse.json({ error: "Voce ja possui uma licenca ativa." }, { status: 409 });
     }
 
     // 5. RESERVA o aparelho na lista definitiva `trials_usados` (ADR-021, sql/10) ANTES de criar a licença.
@@ -186,7 +194,23 @@ export async function POST(req: NextRequest) {
     const chave = gerarChave();
     const expiracao = new Date(Date.now() + TRIAL_DIAS_INSERT * 24 * 60 * 60 * 1000).toISOString();
 
-    const licRes = await fetch(`${SUPABASE_URL}/rest/v1/licencas`, {
+    // Desfaz a reserva quando a licença NÃO foi criada: o aparelho não ganhou trial, então pode tentar de novo.
+    // Filtra pelo cliente também (só apaga a reserva deste pedido) e registra no log se não conseguir.
+    const desfazerReserva = async () => {
+      try {
+        const r = await fetch(
+          `${SUPABASE_URL}/rest/v1/trials_usados?device_id=eq.${encodeURIComponent(device_id)}&cliente_id=eq.${cliente.id}`,
+          { method: "DELETE", headers: { ...headers, Prefer: "return=minimal" } }
+        );
+        if (!r.ok) console.error("Falhou desfazer a reserva do trial: HTTP", r.status);
+      } catch (e) {
+        console.error("Falhou desfazer a reserva do trial:", e);
+      }
+    };
+
+    let licRes: Response;
+    try {
+      licRes = await fetch(`${SUPABASE_URL}/rest/v1/licencas`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -203,15 +227,18 @@ export async function POST(req: NextRequest) {
         max_dispositivos: 1,
         origem: "trial",
       }),
-    });
+      });
+    } catch (e) {
+      // Rede caiu no meio: na dúvida, desfaz a reserva. Se a licença tiver sido criada mesmo assim, o passo 2
+      // (licenças trial deste aparelho) continua barrando um segundo trial aqui.
+      console.error("Erro de rede ao criar trial:", e);
+      await desfazerReserva();
+      return NextResponse.json({ error: "Erro ao ativar trial" }, { status: 500 });
+    }
 
     if (!licRes.ok) {
       console.error("Erro ao criar trial: HTTP", licRes.status);
-      // Desfaz a reserva: o aparelho não ganhou trial nenhum, então pode tentar de novo.
-      await fetch(`${SUPABASE_URL}/rest/v1/trials_usados?device_id=eq.${encodeURIComponent(device_id)}`, {
-        method: "DELETE",
-        headers: { ...headers, Prefer: "return=minimal" },
-      }).catch((e) => console.error("Falhou desfazer a reserva do trial:", e));
+      await desfazerReserva();
       return NextResponse.json({ error: "Erro ao ativar trial" }, { status: 500 });
     }
 
@@ -224,7 +251,7 @@ export async function POST(req: NextRequest) {
       await resend.emails.send({
         from: "MacroForge <noreply@macroforge.com.br>",
         to: email,
-        subject: `Seu trial MacroForge de ${TRIAL_DIAS_INSERT} dias esta ativo!`,
+        subject: `Seu teste grátis do MacroForge (${TRIAL_DIAS_INSERT} dias) está ativo!`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #0D1117; color: #fff; padding: 32px; border-radius: 16px;">
             <div style="text-align: center; margin-bottom: 24px;">
@@ -233,18 +260,15 @@ export async function POST(req: NextRequest) {
             </div>
 
             <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-              <p style="color: #4CAF50; font-size: 16px; font-weight: bold; margin: 0 0 8px 0;">Trial de ${TRIAL_DIAS_INSERT} dias ativado!</p>
-              <p style="color: #8B949E; font-size: 14px; margin: 0 0 12px 0;">Sua chave:</p>
-              <div style="background: #0D1117; border: 2px solid #D4A017; border-radius: 8px; padding: 16px; text-align: center;">
-                <span style="font-family: monospace; font-size: 24px; font-weight: bold; color: #D4A017; letter-spacing: 2px;">${chave}</span>
-              </div>
+              <p style="color: #4CAF50; font-size: 16px; font-weight: bold; margin: 0 0 8px 0;">Teste grátis de ${TRIAL_DIAS_INSERT} dias ativado!</p>
+              <p style="color: #8B949E; font-size: 14px; margin: 0;">Já pode usar o MacroForge em 1 aparelho. Não precisa de chave: é só entrar com a sua conta no app.</p>
             </div>
 
             <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
               <table style="width: 100%; font-size: 14px;">
                 <tr>
                   <td style="color: #8B949E; padding: 4px 0;">Plano</td>
-                  <td style="color: #fff; text-align: right; padding: 4px 0;">Trial gratuito (${TRIAL_DIAS_INSERT} dias)</td>
+                  <td style="color: #fff; text-align: right; padding: 4px 0;">Teste grátis (${TRIAL_DIAS_INSERT} dias, 1 aparelho)</td>
                 </tr>
                 <tr>
                   <td style="color: #8B949E; padding: 4px 0;">Valido ate</td>
@@ -255,7 +279,7 @@ export async function POST(req: NextRequest) {
 
             <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
               <p style="color: #8B949E; font-size: 13px; margin: 0;">
-                Aproveite todas as funcionalidades PRO durante ${TRIAL_DIAS_INSERT} dias. Ao final, assine para continuar usando:
+                Aproveite todas as funcionalidades durante ${TRIAL_DIAS_INSERT} dias. Ao final, assine um plano no app para continuar usando:
                 <a href="https://macroforge.com.br/planos" style="color: #D4A017;">ver planos</a>
               </p>
             </div>

@@ -2,7 +2,8 @@
 // Corpo: { device_id }   ·   Header: Authorization: Bearer <crachá>
 // Respostas (HTTP 200): { ok:true, nova, expira_em, ... }  (nova:true = a vaga tinha vencido e foi pega de novo)
 //                       { ok:false, codigo:"desconectada" } → outro aparelho da conta derrubou este: parar o macro
-//                       { ok:false, codigo:"limite" }       → a vaga tinha vencido e a conta encheu enquanto isso
+//                       { ok:false, codigo:"limite" }       → a vaga tinha vencido e a conta encheu enquanto isso,
+//                                                             ou o plano DIMINUIU e este aparelho ficou acima do limite
 //                       { ok:false, codigo:"sem_plano" }    → o plano acabou
 // HTTP 401 = crachá inválido OU conta apagada (login de novo) · 400 = aparelho inválido · 500 = tente de novo
 import { NextRequest } from "next/server";

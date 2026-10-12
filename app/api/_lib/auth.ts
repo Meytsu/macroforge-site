@@ -50,7 +50,7 @@ export interface CrachaVerificado {
  * o chamador deve responder 401.
  */
 export async function verificarCracha(token: string): Promise<CrachaVerificado> {
-  const { payload } = await jwtVerify(token, getSecret());
+  const { payload } = await jwtVerify(token, getSecret(), { algorithms: ["HS256"] });
   if (!payload.sub) throw new Error("Crachá sem dono (sub)");
   return { clienteId: payload.sub, email: typeof payload.email === "string" ? payload.email : undefined };
 }
@@ -68,7 +68,7 @@ export async function clienteIdDoHeader(authHeader: string | null): Promise<stri
   if (!token) return null;
   const segredo = getSecret(); // fora do try de propósito (ver acima)
   try {
-    const { payload } = await jwtVerify(token, segredo);
+    const { payload } = await jwtVerify(token, segredo, { algorithms: ["HS256"] });
     return payload.sub ? payload.sub : null;
   } catch {
     return null;
