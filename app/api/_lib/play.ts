@@ -42,6 +42,7 @@
 // ============================================================
 
 import { SignJWT, importPKCS8 } from "jose";
+import { APARELHOS_DO_NIVEL } from "@/app/lib/precos";
 
 const PACKAGE_NAME = "com.henrique.macroforge";
 const ESCOPO = "https://www.googleapis.com/auth/androidpublisher";
@@ -309,35 +310,51 @@ export async function consultarAssinatura(
 // Do plano base para (tier, plano, quantidade)
 // ------------------------------------------------------------
 
+export type Tier = "pro" | "mega" | "ultra";
+
+/** ADR-021: aparelhos AO MESMO TEMPO de cada nível. Fonte única com a tela (app/lib/precos.ts) e o CASE do sql/10. */
+export const APARELHOS_DO_TIER: Record<Tier, number> = APARELHOS_DO_NIVEL;
+
 export interface PlanoDecomposto {
-  tier: "pro" | "ultra";
+  tier: Tier;
   plano: "mensal" | "semestral" | "anual";
+  /** Planos NOVOS: aparelhos simultâneos (3/6/10). Planos ANTIGOS: quantidade de chaves. */
   qtdChaves: number;
+  /** true = plano base novo `{tier}-{duracao}` (1 assinatura com N aparelhos); false = antigo `{tier}-{duracao}-{qtd}`. */
+  novo: boolean;
 }
 
 /**
- * Decompõe `pro-mensal-1` em `{tier:'pro', plano:'mensal', qtdChaves:1}`.
+ * Decompõe o plano base do Google:
+ *   NOVO   (ADR-021, 2026-10-11): `pro-mensal` → `{tier:'pro', plano:'mensal', qtdChaves:3, novo:true}`
+ *   ANTIGO (assinaturas que já existem): `pro-mensal-1` → `{tier:'pro', plano:'mensal', qtdChaves:1, novo:false}`
  *
  * ⚠️ O formato não é convenção decorativa: a trava `play_subs_plano_coerente`
- * do `sql/05` exige `base_plan_id = tier || '-' || plano || '-' || qtd_chaves`.
- * Se o Console tiver um plano base fora do padrão, esta função devolve `null` e
- * o endpoint RECUSA a compra — de propósito. Conceder um plano que o banco não
- * reconhece é pior do que recusar: recusar dá erro visível e reembolso
- * automático em 3 dias; conceder errado é silencioso.
+ * (sql/10) aceita exatamente esses dois formatos — no novo, a quantidade tem de
+ * ser a do nível (3/6/10). Se o Console tiver um plano base fora do padrão, esta
+ * função devolve `null` e o endpoint RECUSA a compra — de propósito. Conceder um
+ * plano que o banco não reconhece é pior do que recusar: recusar dá erro visível
+ * e reembolso automático em 3 dias; conceder errado é silencioso.
  *
  * O conserto, se isso acontecer, é renomear o plano base no Console (ou criar
  * um novo seguindo o padrão), **não** afrouxar esta função.
  */
 export function decomporBasePlanId(basePlanId: string): PlanoDecomposto | null {
-  const m = /^(pro|ultra)-(mensal|semestral|anual)-(\d{1,2})$/.exec(basePlanId);
+  const novo = /^(pro|mega|ultra)-(mensal|semestral|anual)$/.exec(basePlanId);
+  if (novo) {
+    const tier = novo[1] as Tier;
+    return { tier, plano: novo[2] as PlanoDecomposto["plano"], qtdChaves: APARELHOS_DO_TIER[tier], novo: true };
+  }
+  const m = /^(pro|ultra)-(mensal|semestral|anual)-(10|[1-9])$/.exec(basePlanId);
   if (!m) return null;
   const qtd = Number(m[3]);
   // O mesmo teto da CHECK da tabela (BETWEEN 1 AND 10).
   if (!Number.isInteger(qtd) || qtd < 1 || qtd > 10) return null;
   return {
-    tier: m[1] as "pro" | "ultra",
-    plano: m[2] as "mensal" | "semestral" | "anual",
+    tier: m[1] as Tier,
+    plano: m[2] as PlanoDecomposto["plano"],
     qtdChaves: qtd,
+    novo: false,
   };
 }
 

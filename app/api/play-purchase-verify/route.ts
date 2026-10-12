@@ -37,32 +37,7 @@ import {
   decomporBasePlanId,
   PRODUTO_ASSINATURA,
 } from "@/app/api/_lib/play";
-
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
-
-/** Chama uma função do banco (RPC do PostgREST) com a service key. */
-async function rpc(fn: string, args: Record<string, unknown>) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(args),
-    cache: "no-store",
-  });
-  const texto = await res.text();
-  if (!res.ok) {
-    throw new Error(`rpc ${fn} falhou: ${res.status} ${texto.slice(0, 300)}`);
-  }
-  try {
-    return JSON.parse(texto);
-  } catch {
-    throw new Error(`rpc ${fn} devolveu resposta não-JSON: ${texto.slice(0, 200)}`);
-  }
-}
+import { rpc } from "@/app/api/_lib/rpc";
 
 export async function POST(req: NextRequest) {
   try {
@@ -163,7 +138,7 @@ export async function POST(req: NextRequest) {
     // ---------------------------------------------------------
     const p = decomporBasePlanId(assin.basePlanId);
     if (!p) {
-      // Plano base fora do padrão `<tier>-<plano>-<qtd>`. RECUSAR é o certo: a
+      // Plano base fora do padrão (`<tier>-<plano>` ou o antigo `<tier>-<plano>-<qtd>`). RECUSAR é o certo: a
       // trava do banco recusaria de qualquer forma, e aqui a mensagem é útil.
       // Conserto = renomear/criar o plano base no Console seguindo o padrão.
       console.error("[play-verify] basePlanId fora do padrão:", assin.basePlanId);
@@ -179,7 +154,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ---------------------------------------------------------
-    // 5) Valor por chave
+    // 5) Valor da assinatura
     // ---------------------------------------------------------
     // ⚠️ LIMITAÇÃO CONHECIDA, registrada de propósito. Usamos o preço RECORRENTE
     // que o Google informa (o do plano base). Para quem entrou por uma OFERTA, o
@@ -204,10 +179,12 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-    const valorPorChave = Math.round((assin.precoRecorrente / p.qtdChaves) * 100) / 100;
+    // ADR-021 (sql/10): o banco grava UMA linha por assinatura, com o limite de aparelhos — tanto no plano base
+    // novo quanto no antigo. Então o valor é sempre o da assinatura inteira (antes era dividido por chave).
+    const valorAssinatura = Math.round(assin.precoRecorrente * 100) / 100;
 
     // ---------------------------------------------------------
-    // 6) Conceder no banco (atômico: ou todas as chaves, ou nenhuma)
+    // 6) Conceder no banco (atômico: a assinatura é gravada inteira ou nada)
     // ---------------------------------------------------------
     const r = await rpc("conceder_play_subscription", {
       p_purchase_token: purchaseToken,
@@ -217,7 +194,7 @@ export async function POST(req: NextRequest) {
       p_plano: p.plano,
       p_qtd_chaves: p.qtdChaves,
       p_data_expiracao: assin.expiryTime,
-      p_valor: valorPorChave,
+      p_valor: valorAssinatura,
       p_linked_purchase_token: assin.linkedPurchaseToken,
       p_auto_renews: assin.autoRenewing,
       p_offer_id: assin.offerId,
@@ -239,6 +216,9 @@ export async function POST(req: NextRequest) {
       novo: r.novo === true,
       renovado: r.renovado === true,
       chaves: r.chaves ?? [],
+      // ADR-021: o plano da assinatura (o app novo mostra "Pro · 3 aparelhos"; o antigo ignora estes campos)
+      nivel: r.nivel ?? p.tier,
+      limite: r.limite ?? p.qtdChaves,
       data_expiracao: r.data_expiracao ?? assin.expiryTime,
       // Útil no teste: distingue compra de testador de licença de compra real.
       teste: assin.ehTeste,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { clienteIdDoHeader } from "@/app/api/_lib/auth";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
@@ -38,30 +39,64 @@ function gerarChave(): string {
   return `MF-${parte()}-${parte()}-${parte()}`;
 }
 
+/**
+ * Lê uma lista do PostgREST. Resposta de erro (permissão, tabela ausente, fora do ar) LANÇA e a rota responde 500.
+ *
+ * O trial é um PORTÃO: na dúvida, fecha. Antes, um erro do banco vinha como objeto ({code, message}), o
+ * `.length` dava `undefined`, a comparação dava falso e o trial era concedido — foi assim que a falta de permissão
+ * em `trials_usados` (2026-10-11) passou sem ninguém ver.
+ */
+async function lerLista<T>(res: Response, oQue: string): Promise<T[]> {
+  const corpo = await res.json().catch(() => null);
+  if (!res.ok || !Array.isArray(corpo)) {
+    throw new Error(`consulta ${oQue} falhou: HTTP ${res.status}`);
+  }
+  return corpo as T[];
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { email, device_id } = await req.json();
+    const corpo = await req.json().catch(() => ({}));
+    const emailCorpo = typeof corpo?.email === "string" ? corpo.email.trim() : "";
+    const device_id = typeof corpo?.device_id === "string" ? corpo.device_id.trim() : "";
 
-    if (!email || !email.includes("@")) {
+    // QUEM pede o trial. App novo (ADR-021): manda o CRACHÁ do login e o cliente sai DELE — o e-mail do corpo é
+    // ignorado, então ninguém ativa o trial de outra pessoa só sabendo o e-mail dela (achado do pentest de
+    // 2026-10-11). Sem crachá: caminho antigo por e-mail, que o app publicado hoje usa — sai junto com o
+    // validar_licenca, quando o app novo estiver publicado.
+    const authHeader = req.headers.get("authorization");
+    const clienteIdCracha = authHeader ? await clienteIdDoHeader(authHeader) : null;
+    if (authHeader && !clienteIdCracha) {
+      return NextResponse.json(
+        { error: "Sessao expirada. Faca login novamente.", codigo: "sem_cracha" },
+        { status: 401 }
+      );
+    }
+
+    if (!clienteIdCracha && (!emailCorpo || !emailCorpo.includes("@"))) {
       return NextResponse.json({ error: "E-mail invalido" }, { status: 400 });
     }
 
-    if (!device_id || device_id.length < 8) {
+    if (device_id.length < 8 || device_id.length > 128) {
       return NextResponse.json({ error: "Device ID invalido" }, { status: 400 });
     }
 
-    // 1. Busca o cliente
+    // 1. Busca o cliente (pelo crachá ou, no caminho antigo, pelo e-mail)
+    const filtroCliente = clienteIdCracha
+      ? `id=eq.${encodeURIComponent(clienteIdCracha)}`
+      : `email=eq.${encodeURIComponent(emailCorpo)}`;
     const clienteRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}&select=id,nome,email,email_confirmado`,
+      `${SUPABASE_URL}/rest/v1/clientes?${filtroCliente}&select=id,nome,email,email_confirmado`,
       { headers }
     );
-    const clientes = await clienteRes.json();
+    const clientes = await lerLista<{ id: string; email: string; email_confirmado?: boolean }>(clienteRes, "clientes");
 
     if (clientes.length === 0) {
       return NextResponse.json({ error: "Conta nao encontrada. Cadastre-se primeiro." }, { status: 404 });
     }
 
     const cliente = clientes[0];
+    const email = cliente.email; // o do banco: é pra ele que vai a confirmação
 
     // 1.5 — TRIAL EXIGE E-MAIL CONFIRMADO (ISSUE-MF-133)
     //
@@ -85,12 +120,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Verifica se esse device_id ja teve trial
+    // 2. Verifica se esse device_id ja teve trial (registros antigos, de antes da lista `trials_usados`)
     const trialDeviceRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/licencas?device_id=eq.${encodeURIComponent(device_id)}&plano=eq.trial&select=id,chave,data_expiracao`,
+      `${SUPABASE_URL}/rest/v1/licencas?device_id=eq.${encodeURIComponent(device_id)}&plano=eq.trial&select=id`,
       { headers }
     );
-    const trialsDevice = await trialDeviceRes.json();
+    const trialsDevice = await lerLista(trialDeviceRes, "trial do aparelho");
 
     if (trialsDevice.length > 0) {
       return NextResponse.json(
@@ -104,7 +139,7 @@ export async function POST(req: NextRequest) {
       `${SUPABASE_URL}/rest/v1/licencas?cliente_id=eq.${cliente.id}&plano=eq.trial&select=id`,
       { headers }
     );
-    const trialsCliente = await trialClienteRes.json();
+    const trialsCliente = await lerLista(trialClienteRes, "trial do cliente");
 
     if (trialsCliente.length > 0) {
       return NextResponse.json(
@@ -118,7 +153,7 @@ export async function POST(req: NextRequest) {
       `${SUPABASE_URL}/rest/v1/licencas?cliente_id=eq.${cliente.id}&status=eq.ativa&data_expiracao=gt.${new Date().toISOString()}&select=id,chave`,
       { headers }
     );
-    const ativas = await licAtiva.json();
+    const ativas = await lerLista<{ chave: string }>(licAtiva, "licencas ativas");
 
     if (ativas.length > 0) {
       return NextResponse.json(
@@ -127,7 +162,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Gera chave trial
+    // 5. RESERVA o aparelho na lista definitiva `trials_usados` (ADR-021, sql/10) ANTES de criar a licença.
+    //
+    // A chave primária (device_id) é a trava: dois pedidos ao mesmo tempo com o mesmo aparelho (até de contas
+    // diferentes) não passam os dois — o segundo recebe 409 do banco. A lista não é apagada pelo reset/
+    // "Desconectar" (o furo de bugs.md 2026-10-09). Sem `ignore-duplicates` de propósito: o conflito TEM de aparecer.
+    const reservaRes = await fetch(`${SUPABASE_URL}/rest/v1/trials_usados`, {
+      method: "POST",
+      headers: { ...headers, Prefer: "return=minimal" },
+      body: JSON.stringify({ device_id, cliente_id: cliente.id }),
+    });
+    if (reservaRes.status === 409) {
+      return NextResponse.json(
+        { error: "Trial ja utilizado neste dispositivo. Assine para continuar." },
+        { status: 409 }
+      );
+    }
+    if (!reservaRes.ok) {
+      throw new Error(`reserva em trials_usados falhou: HTTP ${reservaRes.status}`);
+    }
+
+    // 6. Gera chave trial
     const chave = gerarChave();
     const expiracao = new Date(Date.now() + TRIAL_DIAS_INSERT * 24 * 60 * 60 * 1000).toISOString();
 
@@ -142,18 +197,28 @@ export async function POST(req: NextRequest) {
         status: "ativa",
         device_id,
         data_expiracao: expiracao,
+        // ADR-021 (sql/10): o trial é um plano de 1 aparelho. Sem isto a coluna nova cairia no padrão
+        // ('pro'), e o "Meu plano" do app mostraria "Pro" pra quem está no trial.
+        nivel: "trial",
+        max_dispositivos: 1,
+        origem: "trial",
       }),
     });
 
     if (!licRes.ok) {
-      const err = await licRes.text();
-      console.error("Erro ao criar trial:", err);
+      console.error("Erro ao criar trial: HTTP", licRes.status);
+      // Desfaz a reserva: o aparelho não ganhou trial nenhum, então pode tentar de novo.
+      await fetch(`${SUPABASE_URL}/rest/v1/trials_usados?device_id=eq.${encodeURIComponent(device_id)}`, {
+        method: "DELETE",
+        headers: { ...headers, Prefer: "return=minimal" },
+      }).catch((e) => console.error("Falhou desfazer a reserva do trial:", e));
       return NextResponse.json({ error: "Erro ao ativar trial" }, { status: 500 });
     }
 
-    console.log(`Trial ativado: ${chave} para ${email} (device: ${device_id})`);
+    // Sem chave, e-mail nem aparelho no log (a chave ainda vale como credencial no app antigo).
+    console.log(`Trial ativado para o cliente ${cliente.id}`);
 
-    // 6. Envia email com a chave trial
+    // 7. Envia email com a chave trial
     const dataExp = new Date(expiracao).toLocaleDateString("pt-BR");
     try {
       await resend.emails.send({

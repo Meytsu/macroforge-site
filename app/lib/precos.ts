@@ -69,6 +69,10 @@ export const PROMO_LANCAMENTO_ATIVA = true;
  *
  * Religar quando os dois defeitos do webhook estiverem corrigidos E houver uma compra real de
  * ponta a ponta feita com sucesso.
+ *
+ * 🔴 ADR-021 (2026-10-11): o fluxo do Mercado Pago ainda vende CHAVES por quantidade (modelo antigo). Antes de
+ * religar, ele precisa vender Pro/Mega/Ultra (uma assinatura com `nivel` e `max_dispositivos`), senão o site volta
+ * a vender um produto que o app novo não usa.
  */
 export const VENDA_PELO_SITE_ATIVA = false;
 
@@ -228,4 +232,58 @@ export function economiaPeriodoPct(plano: PlanoId, qtd: number): number {
 
 export function ehPlanoValido(v: unknown): v is PlanoId {
   return v === "mensal" || v === "semestral" || v === "anual";
+}
+
+// =====================================================================================================================
+// PLANOS POR APARELHOS SIMULTÂNEOS (ADR-MF-XCROSS-021, preço = cenário B, decidido em 2026-10-10)
+// =====================================================================================================================
+// O plano é da CONTA: Pro/Mega/Ultra = 3/6/10 aparelhos usando AO MESMO TEMPO. Vendido só pelo app (Google Play);
+// o site só MOSTRA. A tabela acima (por quantidade de chaves) fica para o /api/checkout antigo, que está desligado.
+//
+// Regra que gerou os números (a mesma de agosto): semestral = mensal×6 −18,5%; anual = mensal×12 −33% (,90 mais
+// próximo); lançamento = regular×2/3 (,90 para baixo).
+//
+// ⚠️ AO MUDAR PREÇO: mude no Play Console (planos base `{nivel}-{duracao}`) E aqui.
+
+export type NivelId = "pro" | "mega" | "ultra";
+
+export const NIVEIS: readonly NivelId[] = ["pro", "mega", "ultra"];
+
+export const APARELHOS_DO_NIVEL: Record<NivelId, number> = { pro: 3, mega: 6, ultra: 10 };
+
+export const NOME_NIVEL: Record<NivelId | "trial", string> = {
+  pro: "Pro", mega: "Mega", ultra: "Ultra", trial: "Teste grátis",
+};
+
+const TABELA_NIVEIS: Record<NivelId, Record<PlanoId, { regular: number; lancamento: number }>> = {
+  pro: {
+    mensal:    { regular: 22.9,  lancamento: 14.9 },
+    semestral: { regular: 111.9, lancamento: 73.9 },
+    anual:     { regular: 183.9, lancamento: 121.9 },
+  },
+  mega: {
+    mensal:    { regular: 34.9,  lancamento: 22.9 },
+    semestral: { regular: 170.9, lancamento: 113.9 },
+    anual:     { regular: 280.9, lancamento: 186.9 },
+  },
+  ultra: {
+    mensal:    { regular: 44.9,  lancamento: 29.9 },
+    semestral: { regular: 219.9, lancamento: 145.9 },
+    anual:     { regular: 360.9, lancamento: 239.9 },
+  },
+};
+
+/** Preço vigente do plano (o de lançamento enquanto PROMO_LANCAMENTO_ATIVA). */
+export function precoNivel(nivel: NivelId, duracao: PlanoId): number {
+  const p = TABELA_NIVEIS[nivel][duracao];
+  return PROMO_LANCAMENTO_ATIVA ? p.lancamento : p.regular;
+}
+
+/** Preço regular (o riscado). Igual ao vigente quando a promoção acaba. */
+export function precoNivelRegular(nivel: NivelId, duracao: PlanoId): number {
+  return TABELA_NIVEIS[nivel][duracao].regular;
+}
+
+export function ehNivelValido(v: unknown): v is NivelId {
+  return v === "pro" || v === "mega" || v === "ultra";
 }

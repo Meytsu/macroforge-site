@@ -27,6 +27,15 @@ export async function POST(req: NextRequest) {
       if (Array.isArray(rows) && rows.length > 0) {
         return NextResponse.json({ jaUsou: true, motivo: "device" });
       }
+      // ADR-021 (sql/10): lista definitiva de aparelhos que já fizeram trial (não some com reset/"Desconectar").
+      const u = await fetch(
+        `${SUPABASE_URL}/rest/v1/trials_usados?device_id=eq.${encodeURIComponent(device_id)}&select=device_id&limit=1`,
+        { headers }
+      );
+      const usados = await u.json();
+      if (Array.isArray(usados) && usados.length > 0) {
+        return NextResponse.json({ jaUsou: true, motivo: "device" });
+      }
     }
 
     // Trial já usado por ESTE cliente (qualquer device)?

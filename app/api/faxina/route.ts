@@ -71,7 +71,33 @@ export async function GET(request: NextRequest) {
     // informação diferente de "não rodou".
     console.log(`faxina: ${simular ? "SIMULACAO" : "REAL"} — ${apagados} conta(s), prazo ${HORAS}h`);
 
-    return Response.json({ ok: true, apagados, simulado: simular, horas: HORAS });
+    // ADR-021 (sql/11): vagas de aparelho mortas há mais de 7 dias, de contas que nunca mais voltaram (dentro de cada
+    // conta a faxina já acontece quando ela pede vaga). Só apaga linhas VENCIDAS — ninguém perde vaga em uso. Falhar
+    // aqui não muda o resultado da faxina de contas acima.
+    let vagasApagadas: number | null = null;
+    if (!simular) {
+      try {
+        const rv = await fetch(`${SUPABASE_URL}/rest/v1/rpc/mf_faxina_sessoes`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ p_dias: 7 }),
+        });
+        if (rv.ok) {
+          vagasApagadas = Number(await rv.json()) || 0;
+          console.log(`faxina: ${vagasApagadas} vaga(s) de aparelho mortas apagadas`);
+        } else {
+          console.error("faxina: mf_faxina_sessoes falhou: HTTP", rv.status);
+        }
+      } catch (e) {
+        console.error("faxina: mf_faxina_sessoes erro", e);
+      }
+    }
+
+    return Response.json({ ok: true, apagados, simulado: simular, horas: HORAS, vagas_apagadas: vagasApagadas });
   } catch (e) {
     console.error("faxina: erro", e);
     return Response.json({ ok: false }, { status: 500 });

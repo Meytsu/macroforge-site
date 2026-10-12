@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { emitirCracha } from "@/app/api/_lib/auth";
+import { rpc } from "@/app/api/_lib/rpc";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
@@ -163,6 +164,15 @@ export async function POST(req: NextRequest) {
     );
     const licencas = await licRes.json();
 
+    // ADR-021: o plano que vale pra conta (nível, aparelhos, validade). Campo NOVO — o app antigo ignora.
+    // Falhar aqui não impede o login: o app novo pergunta de novo em /api/aparelhos.
+    let plano: unknown = null;
+    try {
+      plano = await rpc("mf_plano_da_conta", { p_cliente_id: cliente.id });
+    } catch (e) {
+      console.error("Login ok, mas falhou ler o plano (mf_plano_da_conta):", e);
+    }
+
     // MF-103 Bloqueador 1: emite o crachá (JWT, 30 dias) pro app provar identidade depois.
     // Campo NOVO e opcional — o app antigo ignora; só o app novo usa. Não quebra ninguém.
     let token: string | null = null;
@@ -173,7 +183,7 @@ export async function POST(req: NextRequest) {
       console.error("Falha ao emitir crachá (AUTH_JWT_SECRET?):", e);
     }
 
-    return NextResponse.json({ cliente: clienteSeguro, licencas, token });
+    return NextResponse.json({ cliente: clienteSeguro, licencas, token, plano });
   } catch (error) {
     console.error("Erro no login:", error);
     return NextResponse.json({ error: "Erro no servidor" }, { status: 500 });
