@@ -26,7 +26,11 @@ export async function POST(req: NextRequest) {
     if (!purchaseToken || purchaseToken.length > 4096) return recusa("Comprovante inválido", "sem_token");
 
     // Limite por conta ANTES de consultar o Google (a cota da API é a mesma das assinaturas) — sql/12 v3.
-    const lim = await rpc("mf_forjados_limite", { p_cliente_id: clienteId, p_tipo: "compra" });
+    // Falha do PRÓPRIO limite (ex.: função ainda não criada) não derruba a compra paga: segue sem limite e registra.
+    const lim = await rpc("mf_forjados_limite", { p_cliente_id: clienteId, p_tipo: "compra" }).catch((e) => {
+      console.error("[forjados/compra] limite indisponível, seguindo sem:", e);
+      return { ok: true };
+    });
     if (!lim?.ok) {
       if (lim?.codigo === "conta_inexistente") return semCracha();
       return recusa(lim?.erro ?? "Muitos pedidos seguidos.", lim?.codigo ?? "muitos_pedidos", 429);

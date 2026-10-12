@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, erro: "DG inválida", codigo: "invalido" }, { status: 400 });
     }
 
-    const lim = await rpc("mf_forjados_limite", { p_cliente_id: clienteId, p_tipo: "baixar" });
+    // Falha do PRÓPRIO limite (ex.: função ainda não criada) não derruba o download: segue sem limite e registra.
+    const lim = await rpc("mf_forjados_limite", { p_cliente_id: clienteId, p_tipo: "baixar" }).catch((e) => {
+      console.error("[forjados/baixar] limite indisponível, seguindo sem:", e);
+      return { ok: true };
+    });
     if (!lim?.ok) {
       if (lim?.codigo === "conta_inexistente") return semCracha();
       return NextResponse.json(lim ?? { ok: false, codigo: "muitos_pedidos" }, { status: 429 });

@@ -30,6 +30,9 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
  */
 const HORAS_JANELA = 7 * 24;
 
+/** Uma semana de anulações, 1–2 chamadas ao banco por item, em sequência: folga além dos 10 s padrão. */
+export const maxDuration = 60;
+
 async function rpc(fn: string, args: Record<string, unknown>) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: "POST",
