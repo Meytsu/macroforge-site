@@ -9,7 +9,7 @@ export default function Privacidade() {
     <main className="min-h-screen bg-[#0D1117] text-white pt-20 px-6 pb-12">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">Política de Privacidade</h1>
-        <p className="text-gray-500 text-sm mb-8">Última atualização: 21 de junho de 2026</p>
+        <p className="text-gray-500 text-sm mb-8">Última atualização: 15 de novembro de 2026</p>
 
         <div className="space-y-6 text-gray-300 text-sm leading-relaxed">
 
@@ -123,7 +123,7 @@ export default function Privacidade() {
               <li>Obter informações sobre o compartilhamento dos seus dados.</li>
             </ul>
             <p className="mt-2">
-              7.2. Para exercer esses direitos, use o canal de contato da seção 11. Você também
+              7.2. Para exercer esses direitos, use o canal de contato da seção 12. Você também
               pode apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD).
             </p>
           </section>
@@ -170,7 +170,44 @@ export default function Privacidade() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold text-white mb-2">11. Contato</h2>
+            <h2 className="text-lg font-bold text-white mb-2">11. MacroForge PC (programa para Windows)</h2>
+            <p>
+              11.1. O MacroForge PC, programa para Windows que automatiza aplicativos Android em
+              emuladores no seu computador, trata os dados abaixo, além dos já descritos nesta política:
+            </p>
+            <ul className="list-disc pl-6 mt-2 space-y-1">
+              <li><strong>E-mail da conta:</strong> para identificar o login e a licença (é a mesma conta do site e do app);</li>
+              <li><strong>Identificador do computador:</strong> um código (hash SHA-256) calculado a partir do identificador de instalação do Windows (MachineGuid). Não revela o valor original e não contém nome ou arquivos, mas, por identificar o computador, é tratado como dado pessoal. Serve para garantir 1 computador por vez e o limite do teste grátis;</li>
+              <li><strong>Nome do computador:</strong> um apelido (por padrão, o nome do computador no Windows, que você pode editar), mostrado a você para saber qual computador está conectado;</li>
+              <li><strong>Versão do programa:</strong> para exigir atualizações e dar suporte;</li>
+              <li><strong>Endereço IP:</strong> usado apenas para limitar pedidos em excesso e proteger contra abuso.</li>
+            </ul>
+            <p className="mt-2">
+              11.2. O programa <strong>não</strong> lê seus arquivos pessoais, senhas ou conteúdo do seu
+              computador. Ele atua sobre os emuladores Android que você usa com ele. Os macros e
+              configurações ficam no seu computador.
+            </p>
+            <p className="mt-2">
+              11.3. <strong>Finalidades:</strong> autenticar o acesso, aplicar a licença (1 computador por
+              vez e teste grátis), entregar de forma protegida o conteúdo das automações, exigir versão
+              mínima e prevenir fraude e abuso. A base legal é a execução do contrato e o legítimo
+              interesse na segurança e no combate à fraude (LGPD, art. 7º, V e IX).
+            </p>
+            <p className="mt-2">
+              11.4. <strong>Retenção:</strong> as sessões de computador vencidas são apagadas após 7 dias.
+              O identificador do computador usado no teste grátis (o hash, nunca o MachineGuid em si) é
+              mantido para impedir a repetição do teste; se a conta for excluída, ele deixa de ficar ligado
+              a ela e permanece só como marca antifraude de que aquele computador já usou o teste
+              (legítimo interesse, art. 7º, IX). O mesmo vale para o identificador do celular usado no teste grátis do app.
+            </p>
+            <p className="mt-2">
+              11.5. <strong>Não vendemos</strong> esses dados nem os usamos para publicidade. Eles ficam
+              no mesmo banco de dados (Supabase) e são tratados como descrito na seção 6.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold text-white mb-2">12. Contato</h2>
             <p>
               Henrique Alves de Oliveira — Recife/PE, Brasil<br />
               E-mail: <a href="mailto:henrique_alves98@outlook.com" className="text-amber-500 hover:underline">henrique_alves98@outlook.com</a><br />
