@@ -97,7 +97,32 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return Response.json({ ok: true, apagados, simulado: simular, horas: HORAS, vagas_apagadas: vagasApagadas });
+    // Programa do PC (sql/13): vagas de PC vencidas há mais de 7 dias. Falhar (ou a função ainda não existir) não
+    // muda o resultado acima.
+    let vagasPcApagadas: number | null = null;
+    if (!simular) {
+      try {
+        const rp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/mf_pc_faxina_sessoes`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ p_dias: 7 }),
+        });
+        if (rp.ok) {
+          vagasPcApagadas = Number(await rp.json()) || 0;
+          console.log(`faxina: ${vagasPcApagadas} vaga(s) de PC mortas apagadas`);
+        } else {
+          console.error("faxina: mf_pc_faxina_sessoes falhou: HTTP", rp.status);
+        }
+      } catch (e) {
+        console.error("faxina: mf_pc_faxina_sessoes erro", e);
+      }
+    }
+
+    return Response.json({ ok: true, apagados, simulado: simular, horas: HORAS, vagas_apagadas: vagasApagadas, vagas_pc_apagadas: vagasPcApagadas });
   } catch (e) {
     console.error("faxina: erro", e);
     return Response.json({ ok: false }, { status: 500 });

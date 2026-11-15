@@ -7,24 +7,19 @@ const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// TRIAL DE 7 DIAS — decisão do Henrique em 2026-08-10, fechando a ISSUE-MF-118.
+// TRIAL DE 3 DIAS — decisão do Henrique em 2026-11-14 (era 7 desde 2026-08-10, ISSUE-MF-118).
 //
-// Volta ao valor original. Os 30 dias eram incentivo EXCLUSIVO do teste fechado, pra recrutar
-// testador; no teste aberto entra qualquer um e viraria "um mês grátis pra cada futuro
-// pagante". Ele considerou 14 como meio termo e decidiu por 7 — o que tem uma vantagem que
-// nenhum outro valor tinha: **o app já diz 7 em todos os textos**, então nenhum AAB novo é
-// necessário e os três lugares passam a concordar sem tocar no Android.
+// Com o programa do PC, o trial passou a valer também para o PC (1 trial de PC por máquina, `trials_pc_usados`).
+// 3 dias força quem quiser burlar a criar contas novas em poucos dias.
 //
-// 🔴 O ESTADO ANTERIOR ERA PIOR QUE ERRADO — ERA TRÊS NÚMEROS DIFERENTES:
-//     banco gravava           30 dias
-//     e-mail e app diziam      7 dias   (deliberado em 2026-06-28, "não alterar os textos")
-//     painel do site dizia    30 dias grátis
-// O cliente lia 7 no app, 30 no painel, e recebia 30. Agora é 7 em todos os lugares — e
-// esta constante é a ÚNICA fonte: os textos abaixo a interpolam, não repetem o número.
+// Esta constante é a ÚNICA fonte no site: o e-mail abaixo a interpola, não repete o número. O painel do site
+// (app/painel/page.tsx) diz "3 dias" no texto.
+// ⚠️ O APP ANDROID ainda diz "7 dias" em vários textos (BillingHelper, ChavesFragment, ForjadosFragment,
+// HomePageFragment, LicenseGate, MainActivity, PlanosFragment, TrialActivator) — precisa de AAB novo.
 //
 // ⚠️ NÃO confundir com a "garantia de 7 dias" (reembolso via PIX) da landing e da /planos.
 // São coisas diferentes e aquela continua sendo 7.
-const TRIAL_DIAS_INSERT = 7;   // tempo REAL gravado no banco (data_expiracao)
+const TRIAL_DIAS_INSERT = 3;   // tempo REAL gravado no banco (data_expiracao)
 
 const headers = {
   apikey: SUPABASE_KEY,
@@ -110,7 +105,7 @@ export async function POST(req: NextRequest) {
     // 1.5 — TRIAL EXIGE E-MAIL CONFIRMADO (ISSUE-MF-133)
     //
     // Este é o único portão de confirmação do sistema, e é aqui de propósito: o trial é a
-    // ÚNICA coisa que o cadastro sozinho pode render — 7 dias de PRO sem pagar nada. É
+    // ÚNICA coisa que o cadastro sozinho pode render — 3 dias de PRO sem pagar nada. É
     // exatamente o que tem valor pra quem cria conta em massa.
     //
     // Comprar continua liberado (decisão de 2026-08-09): quem está com o cartão na mão não
@@ -303,7 +298,7 @@ export async function POST(req: NextRequest) {
       chave,
       plano: "trial",
       expiracao,
-      dias: TRIAL_DIAS_INSERT, // 7 — coerente com a data de expiração, com o e-mail e com o app
+      dias: TRIAL_DIAS_INSERT, // 3 — coerente com a data de expiração e com o e-mail (o app ainda diz 7 nos textos)
     });
   } catch (error) {
     console.error("Erro no ativar-trial:", error);

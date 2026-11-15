@@ -230,7 +230,7 @@ export default function PainelPage() {
           <div className="flex-1">
             <h3 className="font-bold mb-1">Baixe o MacroForge</h3>
             <p className="text-gray-400 text-sm">
-              Instale pela Google Play e ative <span className="text-amber-500 font-semibold">7 dias grátis</span> no app.
+              Instale pela Google Play e ative <span className="text-amber-500 font-semibold">3 dias grátis</span> no app.
             </p>
           </div>
           <a href={URL_PLAY_STORE} target="_blank" rel="noopener noreferrer" className="shrink-0">

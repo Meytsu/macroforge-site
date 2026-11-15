@@ -63,7 +63,7 @@ export function falha(rota: string, e: unknown) {
   console.error(`[${rota}] erro:`, e);
   return NextResponse.json(
     { ok: false, erro: "Falha no servidor. Tente novamente.", codigo: "erro_interno" },
-    { status: 500 }
+    { status: 500, headers: { "Cache-Control": "no-store" } }
   );
 }
 
@@ -116,4 +116,27 @@ export async function lerPedido(req: NextRequest, opcoes?: { renovar?: boolean }
     body: body && typeof body === "object" ? (body as Record<string, unknown>) : {},
     crachaNovo,
   };
+}
+
+/**
+ * Trava do teste grátis (sql/13 `mf_trial_conferir_aparelho`): conta em trial só usa aparelho que não gastou o
+ * teste em OUTRA conta (o trial do PC nasce sem aparelho, então a vaga sozinha não vê isso). Chamada no
+ * `sessao/iniciar` E no `sessao/sinal` (o sinal também pega vaga nova quando a anterior venceu).
+ * Devolve a recusa do banco (`{ok:false, codigo:"trial_aparelho_usado", erro}`) ou null = pode seguir.
+ * TRANSIÇÃO: se a função ainda não existe no banco (site publicado antes do sql/13), NÃO bloqueia e grita no log —
+ * tirar este desvio depois que o sql/13 estiver aplicado. Outras falhas sobem (viram 500: não libera por engano).
+ */
+export async function recusaDoTrial(clienteId: string, device: string, rota: string): Promise<object | null> {
+  try {
+    const t = await rpc("mf_trial_conferir_aparelho", { p_cliente_id: clienteId, p_device_id: device });
+    if (t && typeof t === "object" && (t as { ok?: unknown }).ok === false) return t as object;
+    return null;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("PGRST202") || /falhou: 404/.test(msg)) {
+      console.error(`[${rota}] mf_trial_conferir_aparelho não existe no banco (sql/13 não aplicado?) — seguindo SEM a trava de trial.`);
+      return null;
+    }
+    throw e;
+  }
 }

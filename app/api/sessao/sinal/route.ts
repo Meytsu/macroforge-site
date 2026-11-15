@@ -5,9 +5,10 @@
 //                       { ok:false, codigo:"limite" }       → a vaga tinha vencido e a conta encheu enquanto isso,
 //                                                             ou o plano DIMINUIU e este aparelho ficou acima do limite
 //                       { ok:false, codigo:"sem_plano" }    → o plano acabou
+//                       { ok:false, codigo:"trial_aparelho_usado", erro } → conta em teste grátis num aparelho que já gastou o teste em outra conta
 // HTTP 401 = crachá inválido OU conta apagada (login de novo) · 400 = aparelho inválido · 500 = tente de novo
-import { NextRequest } from "next/server";
-import { aparelhoInvalido, falha, lerAparelho, lerPedido, respostaDoBanco, rpc, semCracha } from "@/app/api/_lib/vagas";
+import { NextRequest, NextResponse } from "next/server";
+import { aparelhoInvalido, falha, lerAparelho, lerPedido, recusaDoTrial, respostaDoBanco, rpc, semCracha } from "@/app/api/_lib/vagas";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,6 +16,8 @@ export async function POST(req: NextRequest) {
     if (!clienteId) return semCracha();
     const device = lerAparelho(body.device_id);
     if (!device) return aparelhoInvalido();
+    const recusa = await recusaDoTrial(clienteId, device, "sessao/sinal");
+    if (recusa) return NextResponse.json(recusa);
     const r = await rpc("mf_renovar_sessao", { p_cliente_id: clienteId, p_device_id: device });
     return respostaDoBanco(r, crachaNovo);
   } catch (e) {

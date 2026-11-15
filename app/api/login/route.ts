@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { emitirCracha } from "@/app/api/_lib/auth";
 import { rpc } from "@/app/api/_lib/rpc";
+import { conferirLogin } from "@/app/api/_lib/login";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
-
-const MAX_TENTATIVAS = 5;
-const BLOQUEIO_MINUTOS = 15;
 
 const headers = {
   apikey: SUPABASE_KEY,
@@ -16,145 +13,16 @@ const headers = {
   Prefer: "return=representation",
 };
 
-async function verificarBloqueio(email: string): Promise<string | null> {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/tentativas_login?email=eq.${encodeURIComponent(email)}&tipo=eq.login&order=ultima_tentativa.desc&limit=1`,
-    { headers }
-  );
-  const dados = await res.json();
-
-  if (dados.length === 0) return null;
-
-  const reg = dados[0];
-
-  // Verifica se esta bloqueado
-  if (reg.bloqueado_ate) {
-    const bloqueadoAte = new Date(reg.bloqueado_ate);
-    if (new Date() < bloqueadoAte) {
-      const minRestantes = Math.ceil((bloqueadoAte.getTime() - Date.now()) / 60000);
-      return `Muitas tentativas. Aguarde ${minRestantes} minuto(s).`;
-    }
-    // Bloqueio expirou — reseta
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/tentativas_login?id=eq.${reg.id}`,
-      { method: "PATCH", headers, body: JSON.stringify({ tentativas: 0, bloqueado_ate: null }) }
-    );
-    return null;
-  }
-
-  return null;
-}
-
-async function registrarTentativa(email: string, sucesso: boolean) {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/tentativas_login?email=eq.${encodeURIComponent(email)}&tipo=eq.login&order=ultima_tentativa.desc&limit=1`,
-    { headers }
-  );
-  const dados = await res.json();
-
-  if (sucesso) {
-    // Reseta contador ao acertar
-    if (dados.length > 0) {
-      await fetch(
-        `${SUPABASE_URL}/rest/v1/tentativas_login?id=eq.${dados[0].id}`,
-        { method: "PATCH", headers, body: JSON.stringify({ tentativas: 0, bloqueado_ate: null }) }
-      );
-    }
-    return;
-  }
-
-  // Tentativa errada
-  if (dados.length > 0) {
-    const novasTentativas = dados[0].tentativas + 1;
-    const bloqueio = novasTentativas >= MAX_TENTATIVAS
-      ? new Date(Date.now() + BLOQUEIO_MINUTOS * 60 * 1000).toISOString()
-      : null;
-
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/tentativas_login?id=eq.${dados[0].id}`,
-      { method: "PATCH", headers, body: JSON.stringify({
-          tentativas: novasTentativas,
-          ultima_tentativa: new Date().toISOString(),
-          bloqueado_ate: bloqueio,
-        })
-      }
-    );
-  } else {
-    // Primeiro erro — cria registro
-    await fetch(
-      `${SUPABASE_URL}/rest/v1/tentativas_login`,
-      { method: "POST", headers, body: JSON.stringify({
-          email, tipo: "login", tentativas: 1,
-          ultima_tentativa: new Date().toISOString(),
-        })
-      }
-    );
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
     const { email, senha } = await req.json();
 
-    if (!email || !email.includes("@")) {
-      return NextResponse.json({ error: "E-mail invalido" }, { status: 400 });
+    // Conferência de e-mail + senha e freio por e-mail: _lib/login.ts (compartilhado com /api/pc/entrar).
+    const r = await conferirLogin(email, senha);
+    if (!r.ok) {
+      return NextResponse.json({ error: r.error }, { status: r.status });
     }
-
-    if (!senha) {
-      return NextResponse.json({ error: "Digite sua senha" }, { status: 400 });
-    }
-
-    // Verifica bloqueio
-    const bloqueio = await verificarBloqueio(email);
-    if (bloqueio) {
-      return NextResponse.json({ error: bloqueio }, { status: 429 });
-    }
-
-    // Busca o cliente
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}&select=id,nome,email,whatsapp,pais,estado,cidade,senha_hash`,
-      { headers }
-    );
-    const clientes = await res.json();
-
-    if (clientes.length === 0) {
-      await registrarTentativa(email, false);
-      return NextResponse.json({ error: "E-mail nao encontrado" }, { status: 404 });
-    }
-
-    const cliente = clientes[0];
-
-    if (!cliente.senha_hash) {
-      return NextResponse.json({ error: "Conta sem senha. Crie sua conta primeiro." }, { status: 401 });
-    }
-
-    const senhaCorreta = await bcrypt.compare(senha, cliente.senha_hash);
-    if (!senhaCorreta) {
-      await registrarTentativa(email, false);
-
-      // Informa quantas tentativas restam
-      const tentRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/tentativas_login?email=eq.${encodeURIComponent(email)}&tipo=eq.login&order=ultima_tentativa.desc&limit=1`,
-        { headers }
-      );
-      const tentDados = await tentRes.json();
-      const restantes = MAX_TENTATIVAS - (tentDados[0]?.tentativas || 0);
-
-      if (restantes <= 0) {
-        return NextResponse.json(
-          { error: `Conta bloqueada por ${BLOQUEIO_MINUTOS} minutos.` },
-          { status: 429 }
-        );
-      }
-
-      return NextResponse.json(
-        { error: `Senha incorreta. ${restantes} tentativa(s) restante(s).` },
-        { status: 401 }
-      );
-    }
-
-    // Sucesso — reseta tentativas
-    await registrarTentativa(email, true);
+    const cliente = r.cliente;
 
     const { senha_hash, ...clienteSeguro } = cliente;
 
