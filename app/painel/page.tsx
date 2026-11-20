@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useSyncExternalStore } from "react";
 import { URL_PLAY_STORE } from "@/app/lib/precos";
 import { URL_INSTALADOR_PC } from "@/app/lib/pc";
 import { useRouter } from "next/navigation";
@@ -62,27 +62,35 @@ function StatusBadge({ status, dataExp }: { status: string; dataExp: string }) {
   );
 }
 
+// O sessionStorage não avisa mudanças da própria aba: quem grava aqui (logout, renomear, trial…) também chama
+// setSession, então a página não precisa assinar nada.
+const semAssinatura = () => () => {};
+const lerSessaoGuardada = () => sessionStorage.getItem("macroforge_session");
+
 export default function PainelPage() {
-  const [session, setSession] = useState<SessionData | null>(null);
-  const [loading, setLoading] = useState(true);
+  // A sessão gravada no login, lida do sessionStorage pelo useSyncExternalStore (2026-11-20: o setState síncrono
+  // dentro do useEffect renderizava duas vezes — regra react-hooks/set-state-in-effect). No servidor não existe
+  // sessionStorage: undefined = ainda carregando; null = sem sessão (vai para o login).
+  const guardada = useSyncExternalStore(semAssinatura, lerSessaoGuardada, () => undefined);
+  const cache = useMemo<SessionData | null>(() => (guardada ? JSON.parse(guardada) : null), [guardada]);
+  const [atualizada, setSession] = useState<SessionData | null>(null);
+  const session = atualizada ?? cache;
+  const loading = guardada === undefined;
   const router = useRouter();
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("macroforge_session");
-    if (!stored) {
+    if (guardada === undefined) return;
+    if (guardada === null) {
       router.push("/login");
       return;
     }
-    const cached: SessionData = JSON.parse(stored);
-    setSession(cached);
-    setLoading(false);
 
     // Rebusca do servidor ao abrir/atualizar — o sessionStorage e um retrato
     // do momento do login e fica velho (ex.: trial ativado no app DEPOIS do login
     // nao aparecia ate deslogar/logar). GET /api/painel devolve cliente + licencas atuais.
     // /api/painel agora exige o crachá (Authorization: Bearer). Sem token (sessão
     // antiga), pula o refresh e mantém o retrato do login.
-    const token = cached?.token;
+    const token = cache?.token;
     if (!token) return;
     fetch(`/api/painel`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => (res.ok ? res.json() : null))
@@ -95,7 +103,7 @@ export default function PainelPage() {
         }
       })
       .catch(() => { /* sem rede: mantem o que tinha no cache */ });
-  }, [router]);
+  }, [guardada, cache, router]);
 
   function handleLogout() {
     sessionStorage.removeItem("macroforge_session");
