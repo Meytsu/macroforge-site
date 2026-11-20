@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { URL_PLAY_STORE } from "@/app/lib/precos";
+import { URL_INSTALADOR_PC } from "@/app/lib/pc";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -241,6 +242,22 @@ export default function PainelPage() {
               height={250}
               className="h-14 w-auto"
             />
+          </a>
+        </div>
+
+        {/* Baixar o MacroForge PC (2026-11-20): o instalador do Windows, no GitHub Releases do site (app/lib/pc.ts) */}
+        <div className="mb-8 bg-[#161B22] border border-gray-800 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex-1">
+            <h3 className="font-bold mb-1">MacroForge PC (Windows)</h3>
+            <p className="text-gray-400 text-sm">
+              Windows 10 ou 11 (64 bits) com o MSI App Player e o ADB ligado. Entre no programa com esta mesma conta.
+            </p>
+          </div>
+          <a
+            href={URL_INSTALADOR_PC}
+            className="shrink-0 bg-amber-500 hover:bg-amber-600 text-black font-bold px-6 py-3 rounded-xl transition-colors text-center"
+          >
+            Baixar para Windows
           </a>
         </div>
 
