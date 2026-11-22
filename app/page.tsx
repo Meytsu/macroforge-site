@@ -1,5 +1,6 @@
 import Image from "next/image";
 import CheckoutButton from "./components/CheckoutButton";
+import { PC_VERSAO, URL_INSTALADOR_PC } from "./lib/pc";
 
 export default function Home() {
   return (
@@ -17,7 +18,7 @@ export default function Home() {
           Macro<span className="text-amber-500">Forge</span>
         </h1>
         <p className="text-lg md:text-xl text-gray-400 text-center max-w-2xl mb-8">
-          Automatize qualquer tarefa no celular ou emulador.
+          Automatize qualquer tarefa no celular, no emulador ou no PC com Windows.
           Clicks, swipes, reconhecimento de imagem e mais.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
@@ -104,6 +105,44 @@ export default function Home() {
             title="Salvar e Carregar"
             description="Salve seus macros e carregue com um toque. Compartilhe presets."
           />
+        </div>
+      </section>
+
+      {/* MACROFORGE PC (WINDOWS) */}
+      <section id="pc" className="px-6 py-16">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-4">
+            MacroForge PC <span className="text-amber-500">(Windows)</span>
+          </h2>
+          <p className="text-gray-400 text-center max-w-2xl mx-auto mb-10">
+            O programa para computador controla os seus emuladores Android pelo PC e roda os macros prontos das DGs
+            do Cabal Mobile em várias contas ao mesmo tempo, cada uma no seu emulador.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <FeatureCard
+              title="Incluso no seu plano"
+              description="Todo plano ativo (Pro, Mega ou Ultra) inclui 1 computador, além dos aparelhos do app."
+            />
+            <FeatureCard
+              title="Emuladores à vontade"
+              description="Sem limite de emuladores no computador conectado. A conta fica em 1 computador por vez."
+            />
+            <FeatureCard
+              title="Mesma conta do site"
+              description="Entre com o mesmo e-mail e senha. Teste grátis de 3 dias, no app ou no PC."
+            />
+          </div>
+          <div className="text-center">
+            <a
+              href={URL_INSTALADOR_PC}
+              className="inline-block bg-amber-500 hover:bg-amber-600 text-black font-bold px-8 py-4 rounded-xl text-lg transition-colors"
+            >
+              Baixar para Windows
+            </a>
+            <p className="text-gray-500 text-xs mt-3">
+              Versão {PC_VERSAO} · Windows 10 ou 11 (64 bits) · emulador MSI App Player ou BlueStacks 5 · internet
+            </p>
+          </div>
         </div>
       </section>
 
@@ -198,6 +237,10 @@ export default function Home() {
             <FaqItem
               question="Posso usar no BlueStacks?"
               answer="Sim! O MacroForge funciona perfeitamente em emuladores. Ele conta como 1 dispositivo na sua licenca."
+            />
+            <FaqItem
+              question="Tem versão para PC?"
+              answer="Sim! O MacroForge PC (Windows) vem incluso em todo plano ativo: 1 computador por vez, com quantos emuladores quiser. Baixe aqui na página e entre com a mesma conta do site."
             />
             <FaqItem
               question="Leva ban no jogo?"

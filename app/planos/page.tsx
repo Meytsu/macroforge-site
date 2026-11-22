@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import {
   precoTotal, precoPorChave, economiaVolume, descontoVolumePct,
   equivalenteMensal, economiaPeriodoPct, MESES, QUANTIDADES, ehPlanoValido,
@@ -161,6 +162,11 @@ export default function PlanosPage() {
           >
             Abrir na Google Play
           </a>
+
+          <p className="text-gray-400 text-sm mt-6">
+            Todo plano inclui tambem <span className="text-white">1 computador</span> com o MacroForge PC (Windows).{" "}
+            <Link href="/#pc" className="text-amber-500 hover:underline">Saiba mais</Link>
+          </p>
 
           <p className="text-gray-500 text-xs mt-6">
             Ja tem uma chave? Ela continua funcionando normalmente.{" "}
