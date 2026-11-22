@@ -116,7 +116,10 @@ export async function POST(req: NextRequest) {
             currency_id: "BRL",
           },
         ],
-        payer: { email: cliente.email, name: cliente.nome || undefined },
+        // SEM o e-mail do pagador (2026-11-22): com ele preenchido, a conta cujo e-mail é o da conta vendedora do Mercado
+        // Pago ficava com o "Gerar código" bloqueado (o MP vê como pagar a si mesmo). O MP pede o e-mail na hora; quem
+        // recebe o plano é a CONTA do site (metadata.cliente_id), não o e-mail de quem paga.
+        payer: { name: cliente.nome || undefined },
         // PIX e cartão (decisão do Henrique, 2026-11-22). Fora: boleto ("ticket") e lotérica/caixa ("atm") — demoram
         // dias para confirmar e o plano ficaria "pendente".
         payment_methods: {
