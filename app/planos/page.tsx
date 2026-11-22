@@ -65,6 +65,10 @@ export default function PlanosPage() {
   const router = useRouter();
   const guardada = useSyncExternalStore(semAssinatura, lerSessao, () => null);
   const token = tokenDaSessao(guardada);
+  // /planos?teste mostra os botões de compra com a venda desligada (teste controlado do Mercado Pago — o /api/checkout
+  // só aceita os e-mails da lista de teste do servidor; para os outros a compra é recusada do mesmo jeito)
+  const modoTeste = useSyncExternalStore(semAssinatura, () => new URLSearchParams(window.location.search).has("teste"),
+    () => false);
   const [comprando, setComprando] = useState<NivelId | null>(null);
   const [error, setError] = useState("");
 
@@ -104,7 +108,7 @@ export default function PlanosPage() {
 
   // VENDA PELO SITE DESLIGADA: a tela não sai do ar — mostra os planos e manda assinar pelo app.
   // A recusa de verdade está no /api/checkout: esta tela é conveniência, não trava.
-  if (!VENDA_PELO_SITE_ATIVA) {
+  if (!VENDA_PELO_SITE_ATIVA && !modoTeste) {
     return (
       <main className="min-h-screen bg-[#0D1117] text-white pt-20 px-4 pb-12">
         <div className="max-w-3xl mx-auto text-center">

@@ -30,7 +30,11 @@ export async function POST(req: NextRequest) {
   try {
     // VENDA PELO SITE DESLIGADA. Checado ANTES de qualquer coisa — antes de ler o corpo, antes de falar com o
     // Mercado Pago, antes de tocar no banco. Esconder o botão de /planos não bastaria: a URL continuaria viva.
-    if (!VENDA_PELO_SITE_ATIVA) {
+    // Teste controlado (2026-11-22, ISSUE-MF-156): com a venda desligada, só os e-mails da variável MP_TESTE_EMAILS (no
+    // painel da Vercel — nunca no código, o repo é público) passam; a conferência do e-mail é no passo 3, pela conta.
+    const emailsTeste = (process.env.MP_TESTE_EMAILS || "")
+      .split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+    if (!VENDA_PELO_SITE_ATIVA && emailsTeste.length === 0) {
       return NextResponse.json(
         {
           error: "As assinaturas estao disponiveis pelo aplicativo na Google Play.",
@@ -85,6 +89,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Crie sua conta antes de comprar.", precisaCadastro: true }, { status: 403 });
     }
     const cliente = clientes[0] as { id: string; nome?: string | null; email: string };
+    if (!VENDA_PELO_SITE_ATIVA && !emailsTeste.includes((cliente.email || "").trim().toLowerCase())) {
+      return NextResponse.json(
+        { error: "As assinaturas estao disponiveis pelo aplicativo na Google Play.", vendaDesativada: true, urlApp: URL_PLAY_STORE },
+        { status: 503 }
+      );
+    }
 
     // 4) A preferência no Mercado Pago.
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
