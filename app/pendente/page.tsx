@@ -10,7 +10,7 @@ export default function Pendente() {
         </h1>
         <p className="text-gray-400 mb-8">
           Estamos aguardando a confirmacao do pagamento. Assim que confirmado,
-          sua chave sera enviada por e-mail.
+          seu plano e liberado na sua conta e voce recebe um e-mail.
         </p>
         <Link
           href="/"

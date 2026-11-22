@@ -1,319 +1,207 @@
+// ============================================================
+// POST /api/webhook — aviso do Mercado Pago de que um pagamento mudou.
+//
+// Reescrito em 2026-11-22 (ISSUE-MF-156). Antes gerava N chaves `MF-XXXX` e as mandava por e-mail; agora concede o
+// PLANO DA CONTA (Pro/Mega/Ultra, mensal) numa única chamada atômica ao banco.
+//
+// O FLUXO
+//   MP           → "o pagamento 123 mudou"   (o corpo NÃO é confiável: qualquer um pode fazer POST aqui)
+//   esta rota    → pergunta ao MERCADO PAGO como está o pagamento 123 (com o nosso token)
+//                → só `approved` segue
+//                → confere: metadata (cliente_id, nivel, duracao="mensal") + valor pago == precoNivel(nivel) em BRL
+//                     não bate → registra a recusa (mp_pagamentos) e responde 200 — NÃO concede
+//                → rpc mf_conceder_mercado_pago (sql/15): idempotente pelo id do pagamento; mesmo plano soma 30 dias,
+//                  plano diferente entra na fila
+//                     erro do banco → 500 → o Mercado Pago REENVIA (corrige o defeito 2: antes respondia 200 e o
+//                     cliente ficava sem nada)
+//                → e-mail de confirmação (sem chave nenhuma)
+//
+// RESPOSTAS
+//   200 = "pode parar de mandar" (tratado, ignorado, recusado de propósito ou repetido)
+//   500 = "tente de novo"        (Mercado Pago fora, banco fora) — nunca conceder por otimismo
+// ============================================================
+
 import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import { Resend } from "resend";
-
-const client = new MercadoPagoConfig({
-  accessToken: process.env.MP_ACCESS_TOKEN!,
-});
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { rpc } from "@/app/api/_lib/rpc";
+import {
+  precoNivel, ehNivelValido, NOME_NIVEL, APARELHOS_DO_NIVEL, type NivelId,
+} from "@/app/lib/precos";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 
-// Alinhado ao app/checkout/página (MF-103, 2026-06-20). Trimestral removido.
-// (Chaves antigas com plano='trimestral' seguem validas; o mapa só serve pra novas compras.)
-const PLANO_DIAS: Record<string, number> = {
-  mensal: 30,
-  semestral: 180,
-  anual: 365,
-};
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const PLANO_VALOR: Record<string, number> = {
-  mensal: 9.9,
-  semestral: 47.9,
-  anual: 79.9,
-};
-
-const PLANO_NOME: Record<string, string> = {
-  mensal: "Mensal (30 dias)",
-  semestral: "Semestral (180 dias)",
-  anual: "Anual (365 dias)",
-};
-
-function gerarChave(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  const parte = () =>
-    Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  return `MF-${parte()}-${parte()}-${parte()}`;
+/** O id do pagamento, venha no corpo (formato novo) ou na URL (formato antigo `?topic=payment&id=`). */
+function idDoPagamento(req: NextRequest, body: Record<string, unknown>): string | null {
+  const q = req.nextUrl.searchParams;
+  const tipo = (body.type as string) || (body.topic as string) || q.get("type") || q.get("topic") || "";
+  const acao = typeof body.action === "string" ? body.action : "";
+  if (tipo !== "payment" && !acao.startsWith("payment.")) return null;
+  const data = body.data as { id?: unknown } | undefined;
+  const id = data?.id ?? q.get("data.id") ?? q.get("id") ?? body.id;
+  const s = id == null ? "" : String(id).trim();
+  return /^\d+$/.test(s) ? s : null;
 }
 
-async function supabaseFetch(path: string, options: RequestInit) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-      ...options.headers,
-    },
-  });
-  return res;
+function dataBR(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
-async function enviarEmailChave(email: string, chave: string, plano: string, expiracao: string) {
-  const dataExp = new Date(expiracao).toLocaleDateString("pt-BR");
-  const planoNome = PLANO_NOME[plano] || plano;
+async function emailDoCliente(clienteId: string): Promise<string | null> {
+  const r = await fetch(
+    `${SUPABASE_URL}/rest/v1/clientes?id=eq.${encodeURIComponent(clienteId)}&select=email`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, cache: "no-store" }
+  );
+  if (!r.ok) return null;
+  const linhas = await r.json();
+  return Array.isArray(linhas) && linhas[0]?.email ? String(linhas[0].email) : null;
+}
 
-  try {
-    await resend.emails.send({
-      from: "MacroForge <noreply@macroforge.com.br>",
-      to: email,
-      subject: "Sua chave MacroForge esta pronta!",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #0D1117; color: #fff; padding: 32px; border-radius: 16px;">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <h1 style="color: #D4A017; margin: 0;">MacroForge</h1>
-            <p style="color: #8B949E; font-size: 14px;">Automacao inteligente para mobile</p>
-          </div>
-
-          <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-            <p style="color: #8B949E; font-size: 14px; margin: 0 0 8px 0;">Sua chave de licenca:</p>
-            <div style="background: #0D1117; border: 2px solid #D4A017; border-radius: 8px; padding: 16px; text-align: center;">
-              <span style="font-family: monospace; font-size: 24px; font-weight: bold; color: #D4A017; letter-spacing: 2px;">${chave}</span>
-            </div>
-          </div>
-
-          <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-            <table style="width: 100%; font-size: 14px;">
-              <tr>
-                <td style="color: #8B949E; padding: 4px 0;">Plano</td>
-                <td style="color: #fff; text-align: right; padding: 4px 0;">${planoNome}</td>
-              </tr>
-              <tr>
-                <td style="color: #8B949E; padding: 4px 0;">Valido ate</td>
-                <td style="color: #fff; text-align: right; padding: 4px 0;">${dataExp}</td>
-              </tr>
-            </table>
-          </div>
-
-          <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-            <p style="color: #D4A017; font-weight: bold; margin: 0 0 8px 0;">Como ativar:</p>
-            <ol style="color: #8B949E; font-size: 13px; padding-left: 20px; margin: 0;">
-              <li style="margin-bottom: 4px;">Baixe o MacroForge no seu painel: <a href="https://macroforge.com.br/login" style="color: #D4A017;">macroforge.com.br</a></li>
-              <li style="margin-bottom: 4px;">Instale o APK no celular ou BlueStacks</li>
-              <li style="margin-bottom: 4px;">Abra o app e digite a chave acima</li>
-              <li>Pronto! Crie seus macros e automatize</li>
-            </ol>
-          </div>
-
-          <div style="text-align: center; margin-top: 24px;">
-            <p style="color: #8B949E; font-size: 12px;">
-              Duvidas? Fale conosco:
-              <a href="https://wa.me/5581973197753" style="color: #D4A017;">WhatsApp</a>
-            </p>
-            <p style="color: #30363D; font-size: 11px; margin-top: 16px;">MacroForge &copy; 2026</p>
-          </div>
-        </div>
-      `,
-    });
-    console.log(`Email enviado para ${email} com chave ${chave}`);
-  } catch (error) {
-    console.error("Erro ao enviar email:", error);
+/** E-mail de confirmação. Falhar aqui NÃO desfaz nada: o plano já está na conta (só registra no log). */
+async function enviarConfirmacao(
+  email: string, nivel: NivelId, acao: string, dataInicio: string, dataExpiracao: string
+) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
+    console.error("webhook: RESEND_API_KEY ausente; e-mail de confirmacao nao enviado");
+    return;
   }
-}
-
-async function enviarEmailMultichave(email: string, chaves: string[], plano: string, expiracao: string) {
-  const dataExp = new Date(expiracao).toLocaleDateString("pt-BR");
-  const planoNome = PLANO_NOME[plano] || plano;
-
-  const chavesHtml = chaves
-    .map(
-      (c, i) =>
-        `<div style="background: #0D1117; border: 2px solid #D4A017; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 8px;">
-          <span style="color: #8B949E; font-size: 12px;">Chave ${i + 1}</span><br/>
-          <span style="font-family: monospace; font-size: 20px; font-weight: bold; color: #D4A017; letter-spacing: 2px;">${c}</span>
-        </div>`
-    )
-    .join("");
+  const nome = NOME_NIVEL[nivel];
+  const naFila = new Date(dataInicio).getTime() > Date.now() + 60_000;
+  const frase = naFila
+    ? acao === "somou"
+      ? `Somamos 30 dias ao seu plano <b>${nome}</b>: o novo período começa em <b>${dataBR(dataInicio)}</b> e vai até <b>${dataBR(dataExpiracao)}</b>.`
+      : `Seu plano <b>${nome}</b> entrou na fila e começa em <b>${dataBR(dataInicio)}</b>, quando o plano atual terminar. Ele vale até <b>${dataBR(dataExpiracao)}</b>.`
+    : `Seu plano <b>${nome}</b> está ativo até <b>${dataBR(dataExpiracao)}</b>.`;
 
   try {
-    await resend.emails.send({
+    await new Resend(key).emails.send({
       from: "MacroForge <noreply@macroforge.com.br>",
       to: email,
-      subject: `Suas ${chaves.length} chaves MacroForge estao prontas!`,
+      subject: naFila ? `Pagamento confirmado — plano ${nome} na fila` : `Pagamento confirmado — plano ${nome} ativo`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; background: #0D1117; color: #fff; padding: 32px; border-radius: 16px;">
           <div style="text-align: center; margin-bottom: 24px;">
             <h1 style="color: #D4A017; margin: 0;">MacroForge</h1>
-            <p style="color: #8B949E; font-size: 14px;">Automacao inteligente para mobile</p>
           </div>
-
           <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-            <p style="color: #8B949E; font-size: 14px; margin: 0 0 12px 0;">Suas ${chaves.length} chaves de licenca:</p>
-            ${chavesHtml}
+            <p style="color: #fff; font-size: 15px; margin: 0 0 12px 0;">Pagamento confirmado. Obrigado!</p>
+            <p style="color: #C9D1D9; font-size: 14px; margin: 0;">${frase}</p>
+            <p style="color: #8B949E; font-size: 13px; margin: 12px 0 0 0;">
+              ${APARELHOS_DO_NIVEL[nivel]} aparelhos no app + 1 computador com o MacroForge PC. Tudo incluído.
+            </p>
           </div>
-
           <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-            <table style="width: 100%; font-size: 14px;">
-              <tr>
-                <td style="color: #8B949E; padding: 4px 0;">Plano</td>
-                <td style="color: #fff; text-align: right; padding: 4px 0;">${planoNome}</td>
-              </tr>
-              <tr>
-                <td style="color: #8B949E; padding: 4px 0;">Quantidade</td>
-                <td style="color: #fff; text-align: right; padding: 4px 0;">${chaves.length} chaves</td>
-              </tr>
-              <tr>
-                <td style="color: #8B949E; padding: 4px 0;">Valido ate</td>
-                <td style="color: #fff; text-align: right; padding: 4px 0;">${dataExp}</td>
-              </tr>
-            </table>
-          </div>
-
-          <div style="background: #161B22; border: 1px solid #30363D; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
-            <p style="color: #D4A017; font-weight: bold; margin: 0 0 8px 0;">Como ativar:</p>
+            <p style="color: #D4A017; font-weight: bold; margin: 0 0 8px 0;">Como usar:</p>
             <ol style="color: #8B949E; font-size: 13px; padding-left: 20px; margin: 0;">
-              <li style="margin-bottom: 4px;">Cada chave ativa em 1 dispositivo</li>
-              <li style="margin-bottom: 4px;">Baixe o MacroForge: <a href="https://macroforge.com.br/login" style="color: #D4A017;">macroforge.com.br</a></li>
-              <li style="margin-bottom: 4px;">Instale o APK e digite a chave</li>
-              <li>Distribua as chaves restantes para seu grupo</li>
+              <li style="margin-bottom: 4px;">Instale o MacroForge pela Google Play (ou o MacroForge PC pelo site)</li>
+              <li style="margin-bottom: 4px;">Entre com o mesmo e-mail e senha da sua conta do site</li>
+              <li>Pronto: o plano já está na sua conta</li>
             </ol>
           </div>
-
           <div style="text-align: center; margin-top: 24px;">
             <p style="color: #8B949E; font-size: 12px;">
-              Duvidas? Fale conosco:
-              <a href="https://wa.me/5581973197753" style="color: #D4A017;">WhatsApp</a>
+              Dúvidas? <a href="https://wa.me/5581973197753" style="color: #D4A017;">WhatsApp</a> ·
+              <a href="https://macroforge.com.br/painel" style="color: #D4A017;">Minha conta</a>
             </p>
             <p style="color: #30363D; font-size: 11px; margin-top: 16px;">MacroForge &copy; 2026</p>
           </div>
         </div>
       `,
     });
-    console.log(`Email enviado para ${email} com ${chaves.length} chaves`);
-  } catch (error) {
-    console.error("Erro ao enviar email multichave:", error);
+  } catch (e) {
+    console.error("webhook: erro ao enviar e-mail de confirmacao:", e);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-
-    if (body.type !== "payment" && body.action !== "payment.created") {
-      return NextResponse.json({ ok: true, ignored: true });
-    }
-
-    const paymentId = body.data?.id;
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const paymentId = idDoPagamento(req, body);
     if (!paymentId) {
-      return NextResponse.json({ ok: true, ignored: true });
+      return NextResponse.json({ ok: true, ignorado: true });
     }
 
-    const payment = new Payment(client);
-    const paymentData = await payment.get({ id: paymentId });
-
-    if (paymentData.status !== "approved") {
-      console.log(`Pagamento ${paymentId} com status: ${paymentData.status}`);
-      return NextResponse.json({ ok: true, status: paymentData.status });
+    const accessToken = process.env.MP_ACCESS_TOKEN;
+    if (!accessToken || !SUPABASE_URL || !SUPABASE_KEY) {
+      console.error("webhook: ambiente incompleto (MP/Supabase); pedindo reenvio");
+      return NextResponse.json({ error: "Servico indisponivel" }, { status: 500 });
     }
 
-    const email = paymentData.metadata?.email || paymentData.payer?.email;
-    const plano = paymentData.metadata?.plano || "mensal";
-    const quantidade = Math.max(1, parseInt(paymentData.metadata?.quantidade, 10) || 1);
+    // 1) A verdade vem do Mercado Pago, não do corpo. Se o MP falhar, lança → 500 → ele reenvia.
+    const pag = await new Payment(new MercadoPagoConfig({ accessToken })).get({ id: paymentId });
 
-    if (!email) {
-      console.error("Pagamento sem e-mail:", paymentId);
-      return NextResponse.json({ error: "E-mail nao encontrado" }, { status: 400 });
+    if (pag.status !== "approved") {
+      console.log(`webhook: pagamento ${paymentId} com status ${pag.status}`);
+      return NextResponse.json({ ok: true, status: pag.status });
     }
 
-    console.log(`Pagamento aprovado! E-mail: ${email}, Plano: ${plano}, Qty: ${quantidade}`);
+    // 2) Quem e o quê — da metadata que o NOSSO /api/checkout gravou (o MP devolve as chaves em snake_case).
+    const meta = (pag.metadata ?? {}) as Record<string, unknown>;
+    const clienteId = typeof meta.cliente_id === "string" && UUID_RE.test(meta.cliente_id) ? meta.cliente_id : null;
+    const nivelBruto = meta.nivel;
+    const duracao = meta.duracao;
+    const valorPago = Number(pag.transaction_amount);
+    const moeda = pag.currency_id;
 
-    // 0. Idempotência: o Mercado Pago REENVIA notificações de rotina (e poderiam ser
-    // repetidas/maliciosas). Se já criamos licença(s) pra este pagamento, não cria de
-    // novo — senão o mesmo pagamento gera chaves duplicadas (chave grátis extra).
-    const jaResp = await supabaseFetch(
-      `licencas?mp_payment_id=eq.${encodeURIComponent(String(paymentId))}&select=chave`,
-      { method: "GET" }
-    );
-    const jaExistentes = await jaResp.json();
-    if (Array.isArray(jaExistentes) && jaExistentes.length > 0) {
-      console.log(`Pagamento ${paymentId} já processado (${jaExistentes.length} chave(s)). Duplicata ignorada.`);
-      return NextResponse.json({ ok: true, jaProcessado: true });
+    let motivo: string | null = null;
+    if (!clienteId) motivo = "metadata sem cliente_id valido";
+    else if (!ehNivelValido(nivelBruto)) motivo = `nivel invalido na metadata: ${String(nivelBruto)}`;
+    else if (duracao !== "mensal") motivo = `duracao inesperada: ${String(duracao)}`;
+    else if (moeda !== "BRL") motivo = `moeda inesperada: ${String(moeda)}`;
+    else if (!Number.isFinite(valorPago) || Math.round(valorPago * 100) !== Math.round(precoNivel(nivelBruto) * 100)) {
+      motivo = `valor pago ${valorPago} diferente do preco ${precoNivel(nivelBruto)} (${nivelBruto})`;
     }
 
-    // 1. Busca ou cria o cliente
-    let clienteId: string;
+    if (motivo) {
+      // NÃO concede. Fica o recibo para o Henrique olhar (e devolver o dinheiro, se for o caso). 200 = o MP para.
+      // Se nem o registro der certo, 500: melhor o MP reenviar do que a recusa sumir sem rastro.
+      console.error(`webhook: pagamento ${paymentId} APROVADO mas RECUSADO: ${motivo}`);
+      await rpc("mf_mp_registrar_recusa", {
+        p_payment_id: paymentId,
+        p_cliente_id: clienteId,
+        p_nivel: typeof nivelBruto === "string" ? nivelBruto : null,
+        p_valor: Number.isFinite(valorPago) ? valorPago : null,
+        p_motivo: motivo,
+      });
+      return NextResponse.json({ ok: true, recusado: true });
+    }
 
-    const clienteResp = await supabaseFetch(`clientes?email=eq.${encodeURIComponent(email)}`, {
-      method: "GET",
+    const nivel = nivelBruto as NivelId;
+
+    // 3) Concessão atômica e idempotente. Erro de rede/banco LANÇA → catch → 500 → o MP reenvia.
+    const r = await rpc("mf_conceder_mercado_pago", {
+      p_payment_id: paymentId,
+      p_cliente_id: clienteId,
+      p_nivel: nivel,
+      p_valor: valorPago,
     });
-    const clientes = await clienteResp.json();
 
-    // PAGAMENTO APROVADO CONFIRMA O E-MAIL (ISSUE-MF-133).
-    //
-    // Este é o ÚNICO lugar do sistema onde comprar marca `email_confirmado`. Aqui já
-    // existe dinheiro: o `status !== "approved"` foi barrado lá em cima.
-    //
-    // Cobre os dois caminhos, e o segundo é o que o Henrique levantou:
-    //   - comprou sem ter conta          -> a linha nasce já confirmada
-    //   - CADASTROU e depois comprou     -> a linha existia com false, e o PATCH corrige
-    // O checkout sozinho não cobriria o segundo caso: lá a linha já existe, então ele
-    // nunca passa pelo ramo de criação.
-    if (clientes.length > 0) {
-      clienteId = clientes[0].id;
-
-      if (clientes[0].email_confirmado === false) {
-        await supabaseFetch(`clientes?id=eq.${clienteId}`, {
-          method: "PATCH",
-          body: JSON.stringify({ email_confirmado: true }),
-        });
-      }
-    } else {
-      const novoResp = await supabaseFetch("clientes", {
-        method: "POST",
-        body: JSON.stringify({ nome: email.split("@")[0], email, email_confirmado: true }),
-      });
-      const novos = await novoResp.json();
-      clienteId = novos[0].id;
+    if (!r?.ok) {
+      // Recusa TRATADA do banco (conta apagada, pagamento de outra conta, já recusado antes). Reenviar não muda nada.
+      console.error(`webhook: banco recusou o pagamento ${paymentId}:`, r?.codigo, r?.erro);
+      return NextResponse.json({ ok: true, recusado: true, codigo: r?.codigo });
     }
 
-    // 2. Gera N chaves de licenca
-    const dias = PLANO_DIAS[plano] || 30;
-    const valor = paymentData.transaction_amount
-      ? Number(paymentData.transaction_amount) / quantidade
-      : PLANO_VALOR[plano] || 9.9;
-    const expiracao = new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString();
-
-    const chaves: string[] = [];
-
-    for (let i = 0; i < quantidade; i++) {
-      const chave = gerarChave();
-
-      const licencaResp = await supabaseFetch("licencas", {
-        method: "POST",
-        body: JSON.stringify({
-          chave,
-          cliente_id: clienteId,
-          plano,
-          valor: Math.round(valor * 100) / 100,
-          status: "ativa",
-          data_expiracao: expiracao,
-          mp_payment_id: String(paymentId),
-        }),
-      });
-
-      if (licencaResp.ok) {
-        chaves.push(chave);
-        console.log(`Licenca ${i + 1}/${quantidade} gerada: ${chave}`);
-      } else {
-        const err = await licencaResp.text();
-        console.error(`Erro ao criar licenca ${i + 1}:`, err);
-      }
+    if (r.repetido) {
+      // Reenvio do MP para um pagamento já concedido: nada a fazer (o e-mail já foi na 1ª vez).
+      return NextResponse.json({ ok: true, repetido: true });
     }
 
-    // 3. Envia email com a(s) chave(s)
-    if (chaves.length === 1) {
-      await enviarEmailChave(email, chaves[0], plano, expiracao);
-    } else if (chaves.length > 1) {
-      await enviarEmailMultichave(email, chaves, plano, expiracao);
+    console.log(`webhook: pagamento ${paymentId} concedido: ${nivel} ${r.acao} ate ${r.data_expiracao}`);
+
+    // 4) E-mail de confirmação (falha aqui não muda a resposta: o plano já está na conta).
+    const email = (await emailDoCliente(clienteId!)) ?? pag.payer?.email ?? null;
+    if (email) {
+      await enviarConfirmacao(email, nivel, String(r.acao), String(r.data_inicio), String(r.data_expiracao));
     }
 
-    return NextResponse.json({ ok: true, chaves });
+    return NextResponse.json({ ok: true, acao: r.acao });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Erro desconhecido";
-    console.error("Erro no webhook:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("webhook: erro (pedindo reenvio ao Mercado Pago):", error);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

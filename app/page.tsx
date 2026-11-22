@@ -1,6 +1,7 @@
 import Image from "next/image";
 import CheckoutButton from "./components/CheckoutButton";
 import { PC_VERSAO, URL_INSTALADOR_PC } from "./lib/pc";
+import { NIVEIS, NOME_NIVEL, APARELHOS_DO_NIVEL, precoNivel, formatarPreco } from "./lib/precos";
 
 export default function Home() {
   return (
@@ -153,73 +154,38 @@ export default function Home() {
             Como funciona
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <Step number="1" title="Assine" description="Escolha seu plano e pague via PIX" />
-            <Step number="2" title="Receba a chave" description="Sua chave chega por e-mail na hora" />
-            <Step number="3" title="Ative no app" description="Instale pela Google Play e digite sua chave" />
+            <Step number="1" title="Crie sua conta" description="Cadastre-se no site com e-mail e senha" />
+            <Step number="2" title="Escolha o plano" description="Pro, Mega ou Ultra — ou comece pelo teste grátis de 3 dias" />
+            <Step number="3" title="Entre no app ou no PC" description="Instale e entre com o mesmo e-mail e senha do site" />
             <Step number="4" title="Automatize" description="Crie macros e deixe o app trabalhar" />
           </div>
         </div>
       </section>
 
-      {/* PLANOS */}
+      {/* PLANOS — ADR-MF-XCROSS-022: só mensal, tudo incluído; o plano muda só os aparelhos. Preço de lib/precos.ts. */}
       <section id="planos" className="px-6 py-16 max-w-5xl mx-auto">
         <h2 className="text-3xl font-bold text-center mb-4">Planos</h2>
-        <p className="text-gray-400 text-center mb-4">
-          Cancele quando quiser. Sem fidelidade.
+        <p className="text-gray-400 text-center mb-10 max-w-2xl mx-auto">
+          Todo plano inclui tudo: todas as DGs, TG, Coleção e Loja de DP, no app e no PC. O plano só muda quantos
+          aparelhos usam ao mesmo tempo. Teste grátis de 3 dias com tudo liberado (1 celular + 1 PC).
         </p>
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2 mb-10 text-center max-w-md mx-auto">
-          <p className="text-amber-400 text-sm font-semibold">
-            Promocao de lancamento — oferta por tempo limitado
-          </p>
-        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          <PlanCard
-            name="Mensal"
-            price="9,90"
-            period="/mes"
-            plano="mensal"
-            features={[
-              "Todas as funcionalidades",
-              "1 dispositivo",
-              "Suporte via WhatsApp",
-              "Atualizacoes incluidas",
-            ]}
-            highlight={false}
-          />
-          <PlanCard
-            name="Semestral"
-            priceOld="59,40"
-            price="47,90"
-            perMonth="7,98"
-            period="/6 meses"
-            plano="semestral"
-            features={[
-              "Todas as funcionalidades",
-              "1 dispositivo",
-              "Suporte prioritario",
-              "Atualizacoes incluidas",
-              "Economia de 19%",
-            ]}
-            highlight={true}
-          />
-          <PlanCard
-            name="Anual"
-            priceOld="118,80"
-            price="79,90"
-            perMonth="6,66"
-            period="/ano"
-            plano="anual"
-            badge="Melhor valor"
-            features={[
-              "Todas as funcionalidades",
-              "1 dispositivo",
-              "Suporte prioritario",
-              "Atualizacoes incluidas",
-              "Economia de 32%",
-              "4 meses gratis",
-            ]}
-            highlight={false}
-          />
+          {NIVEIS.map((n) => (
+            <PlanCard
+              key={n}
+              name={NOME_NIVEL[n]}
+              price={formatarPreco(precoNivel(n))}
+              period="/mes"
+              plano={n}
+              features={[
+                `${APARELHOS_DO_NIVEL[n]} aparelhos ao mesmo tempo`,
+                "1 computador (MacroForge PC)",
+                "Tudo incluído",
+                "Suporte via WhatsApp",
+              ]}
+              highlight={n === "mega"}
+            />
+          ))}
         </div>
       </section>
 
@@ -236,7 +202,7 @@ export default function Home() {
             />
             <FaqItem
               question="Posso usar no BlueStacks?"
-              answer="Sim! O MacroForge funciona perfeitamente em emuladores. Ele conta como 1 dispositivo na sua licenca."
+              answer="Sim! O MacroForge funciona perfeitamente em emuladores. Cada emulador com o app conta como 1 aparelho do seu plano (Pro 3, Mega 6, Ultra 10)."
             />
             <FaqItem
               question="Tem versão para PC?"
@@ -248,11 +214,11 @@ export default function Home() {
             />
             <FaqItem
               question="Como cancelo?"
-              answer="Basta nao renovar. Sua licenca expira na data final e o app para de funcionar. Sem cobranca automatica."
+              answer="Pela Google Play, cancele a assinatura na sua conta Google: o plano vale até o fim do mês já pago. Sem fidelidade."
             />
             <FaqItem
               question="Posso trocar de celular?"
-              answer="Sim! Entre em contato pelo WhatsApp que liberamos a chave para o novo dispositivo."
+              answer="Sim! O plano é da sua conta, não do aparelho: entre no celular novo com o mesmo e-mail e senha. Se as vagas do plano estiverem cheias, desconecte o aparelho antigo pelo app ou fale com a gente no WhatsApp."
             />
             <FaqItem
               question="Tem reembolso?"

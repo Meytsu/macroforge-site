@@ -1,177 +1,154 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  precoTotal, precoPorChave, economiaVolume, descontoVolumePct,
-  equivalenteMensal, economiaPeriodoPct, MESES, QUANTIDADES, ehPlanoValido,
-  VENDA_PELO_SITE_ATIVA, URL_PLAY_STORE,
-  type PlanoId,
+  NIVEIS, NOME_NIVEL, APARELHOS_DO_NIVEL, precoNivel, formatarPreco,
+  VENDA_PELO_SITE_ATIVA, URL_PLAY_STORE, type NivelId,
 } from "@/app/lib/precos";
 
-// SEM PREÇO AQUI. Só identidade e rótulo — todo valor vem de app/lib/precos.ts.
-// Os antigos precoRegular (59,40 / 118,80) e economia ("19%" / "32%") eram números escritos
-// à mão que continuariam de pé depois de a promoção acabar no Play. Agora são derivados.
-const PLANOS: Array<{
-  id: PlanoId; nome: string; periodo: string;
-  destaque?: boolean; melhorValor?: boolean; bonus?: string;
-}> = [
-  { id: "mensal",    nome: "Mensal",    periodo: "/mes" },
-  { id: "semestral", nome: "Semestral", periodo: "/6 meses", destaque: true },
-  { id: "anual",     nome: "Anual",     periodo: "/ano", melhorValor: true, bonus: "4 meses gratis" },
-];
+// SEM PREÇO AQUI. Todo valor vem de app/lib/precos.ts — a MESMA função que o /api/checkout cobra e o /api/webhook
+// confere. ADR-MF-XCROSS-022 (2026-11-22): só mensal, tudo incluído; o plano só muda a quantidade de aparelhos.
 
-// As quantidades e a escada de desconto vêm de `app/lib/precos.ts`, junto com os preços.
-// Duplicar isso em dois arquivos foi como o site acabou com duas tabelas divergentes.
+const DESTAQUE: NivelId = "mega";
 
-function formatPrice(value: number): string {
-  return value.toFixed(2).replace(".", ",");
+// Sessão do login (sessionStorage), lida como no /painel: useSyncExternalStore em vez de setState dentro do
+// useEffect (regra react-hooks/set-state-in-effect). No servidor não existe sessionStorage → null.
+const semAssinatura = () => () => {};
+const lerSessao = () => sessionStorage.getItem("macroforge_session");
+
+function tokenDaSessao(guardada: string | null): string | null {
+  if (!guardada) return null;
+  try {
+    const t = JSON.parse(guardada)?.token;
+    return typeof t === "string" && t ? t : null;
+  } catch {
+    return null;
+  }
 }
+
+function CardPlano({ nivel, children }: { nivel: NivelId; children?: React.ReactNode }) {
+  const destaque = nivel === DESTAQUE;
+  return (
+    <div
+      className={`relative rounded-xl p-5 border text-left ${
+        destaque ? "border-amber-500 bg-[#161B22] ring-2 ring-amber-500/30" : "border-gray-700 bg-[#161B22]"
+      }`}
+    >
+      {destaque && (
+        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+          Mais popular
+        </div>
+      )}
+      <p className="font-bold text-lg">{NOME_NIVEL[nivel]}</p>
+      <div className="flex items-baseline gap-1 mt-1">
+        <span className="text-sm text-amber-400">R$</span>
+        <span className="text-3xl font-bold text-amber-500">{formatarPreco(precoNivel(nivel))}</span>
+        <span className="text-gray-400 text-sm">/mes</span>
+      </div>
+      <ul className="space-y-1.5 mt-4 text-sm text-gray-300">
+        <li><span className="text-amber-500">&#10003;</span> {APARELHOS_DO_NIVEL[nivel]} aparelhos ao mesmo tempo</li>
+        <li><span className="text-amber-500">&#10003;</span> 1 computador (MacroForge PC)</li>
+        <li><span className="text-amber-500">&#10003;</span> Tudo incluido</li>
+      </ul>
+      {children}
+    </div>
+  );
+}
+
+const TUDO_INCLUIDO =
+  "Todo plano inclui tudo: todas as DGs, TG, Colecao e Loja de DP, no app e no PC. O plano so muda quantos aparelhos usam ao mesmo tempo.";
 
 export default function PlanosPage() {
   const router = useRouter();
-  const [planoId, setPlanoId] = useState("mensal");
-  const [quantidade, setQuantidade] = useState(1);
-  const [email, setEmail] = useState("");
-  const [emailConfirmado, setEmailConfirmado] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const guardada = useSyncExternalStore(semAssinatura, lerSessao, () => null);
+  const token = tokenDaSessao(guardada);
+  const [comprando, setComprando] = useState<NivelId | null>(null);
   const [error, setError] = useState("");
-  const [logado, setLogado] = useState(false);
 
-  useEffect(() => {
-    const session = sessionStorage.getItem("macroforge_session");
-    if (session) {
-      try {
-        const data = JSON.parse(session);
-        if (data.cliente?.email) {
-          setEmail(data.cliente.email);
-          setEmailConfirmado(true);
-          setLogado(true);
-        }
-      } catch {
-        /* ignora */
-      }
-    }
-  }, []);
-
-  // 🔴 TODO NÚMERO DAQUI PRA BAIXO VEM DE `app/lib/precos.ts` — a MESMA função que o
-  // /api/checkout usa pra cobrar. Antes, a tela calculava por conta própria e o checkout
-  // calculava de novo, com arredondamentos diferentes: em 6 das 9 combinações os dois
-  // discordavam, e o cliente via um número e pagava outro.
-  const idPlano: PlanoId = ehPlanoValido(planoId) ? planoId : "mensal";
-  const plano = PLANOS.find((p) => p.id === idPlano) ?? PLANOS[0];
-  const mesesNoPlano = MESES[idPlano];
-
-  const totalComDesconto = precoTotal(idPlano, quantidade);
-  const precoUnitario = precoPorChave(idPlano, quantidade);
-  const totalSemDesconto = precoTotal(idPlano, 1) * quantidade;
-
-  // Desconto de volume DERIVADO do preço real, não uma constante escrita à mão.
-  const desconto = descontoVolumePct(idPlano, quantidade) / 100;
-
-  // Economia do periodo (semestral/anual vs pagar mensal pelo mesmo tempo)
-  const equivalenteMensalTotal = equivalenteMensal(idPlano, quantidade);
-  const economiaPeriodo = Math.max(0, equivalenteMensalTotal - totalSemDesconto);
-
-  // Economia do volume (comprar N de uma vez vs N compras de 1)
-  const economiaVolumeValor = economiaVolume(idPlano, quantidade);
-
-  // Total economizado
-  const economiaTotal = economiaPeriodo + economiaVolumeValor;
-
-  async function handleComprar() {
-    if (!email || !email.includes("@")) {
-      setError("Digite um e-mail valido");
-      return;
-    }
-
-    if (!logado) {
+  async function comprar(nivel: NivelId) {
+    if (!token) {
       router.push("/login");
       return;
     }
-
-    setLoading(true);
+    setComprando(nivel);
     setError("");
-
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plano: planoId, email, quantidade }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ nivel }),
       });
-
-      const data = await res.json();
-
-      // O servidor recusa compra de quem não tem conta (ISSUE-MF-140). Isso normalmente
-      // não acontece — esta tela já manda pro login antes —, mas a sessão pode ter
-      // expirado, ou a conta ter sido apagada pela faxina de não confirmados. Mandar pro
-      // cadastro é a saída; mostrar "Crie sua conta antes de comprar" numa caixa de erro
-      // vermelha deixaria a pessoa sem ação nenhuma.
+      const data = await res.json().catch(() => ({}));
+      if (data.precisaLogin) {
+        router.push("/login");
+        return;
+      }
       if (data.precisaCadastro) {
         router.push("/cadastro");
         return;
       }
-
-      if (data.error) {
-        setError(data.error);
-        setLoading(false);
+      if (!res.ok || !data.checkout_url) {
+        setError(data.error || "Nao foi possivel iniciar o pagamento. Tente novamente.");
+        setComprando(null);
         return;
       }
-
-      window.location.href = data.checkout_url;
+      window.location.assign(data.checkout_url);
     } catch {
       setError("Erro ao conectar. Tente novamente.");
-      setLoading(false);
+      setComprando(null);
     }
   }
 
-  // VENDA PELO SITE DESLIGADA (2026-08-10). A tela nao sai do ar: explica e manda pro app.
-  //
-  // Preferido a esconder o link porque link escondido deixa a URL viva — e ha 5 lugares
-  // apontando pra ca (landing, faq, painel x2, CheckoutButton). Uma pagina que explica e melhor
-  // que 5 links removidos e um 404, e e UM lugar pra reverter.
-  //
-  // A recusa de verdade esta no /api/checkout: esta tela e conveniencia, nao trava.
+  // VENDA PELO SITE DESLIGADA: a tela não sai do ar — mostra os planos e manda assinar pelo app.
+  // A recusa de verdade está no /api/checkout: esta tela é conveniência, não trava.
   if (!VENDA_PELO_SITE_ATIVA) {
     return (
       <main className="min-h-screen bg-[#0D1117] text-white pt-20 px-4 pb-12">
-        <div className="max-w-md mx-auto text-center">
+        <div className="max-w-3xl mx-auto text-center">
           <Image src="/icon.png" alt="MacroForge" width={64} height={64} className="mx-auto mb-6" />
           <h1 className="text-2xl font-bold mb-3">Assine pelo aplicativo</h1>
-          <p className="text-gray-400 text-sm mb-6">
+          <p className="text-gray-400 text-sm mb-8 max-w-md mx-auto">
             As assinaturas do MacroForge sao feitas dentro do app, pela Google Play. E mais
             rapido, e voce gerencia tudo direto na sua conta Google.
           </p>
 
-          <div className="bg-[#161B22] border border-gray-800 rounded-xl p-5 mb-6 text-left">
-            <p className="text-sm text-gray-300 mb-3 font-semibold">Como assinar</p>
-            <ol className="text-sm text-gray-400 space-y-2 list-decimal list-inside">
-              <li>Instale o MacroForge pela Google Play</li>
-              <li>Entre com a mesma conta que voce usa aqui</li>
-              <li>Abra <span className="text-white">Planos</span> dentro do app</li>
-            </ol>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            {NIVEIS.map((n) => <CardPlano key={n} nivel={n} />)}
           </div>
+          <p className="text-gray-400 text-xs mb-8 max-w-md mx-auto">{TUDO_INCLUIDO}</p>
 
-          <a
-            href={URL_PLAY_STORE}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block w-full py-3 rounded-xl font-bold bg-amber-500 hover:bg-amber-600 text-black transition-colors"
-          >
-            Abrir na Google Play
-          </a>
+          <div className="max-w-md mx-auto">
+            <div className="bg-[#161B22] border border-gray-800 rounded-xl p-5 mb-6 text-left">
+              <p className="text-sm text-gray-300 mb-3 font-semibold">Como assinar</p>
+              <ol className="text-sm text-gray-400 space-y-2 list-decimal list-inside">
+                <li>Instale o MacroForge pela Google Play</li>
+                <li>Entre com a mesma conta que voce usa aqui</li>
+                <li>Abra <span className="text-white">Planos</span> dentro do app</li>
+              </ol>
+            </div>
 
-          <p className="text-gray-400 text-sm mt-6">
-            Todo plano inclui tambem <span className="text-white">1 computador</span> com o MacroForge PC (Windows).{" "}
-            <Link href="/#pc" className="text-amber-500 hover:underline">Saiba mais</Link>
-          </p>
+            <a
+              href={URL_PLAY_STORE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block w-full py-3 rounded-xl font-bold bg-amber-500 hover:bg-amber-600 text-black transition-colors"
+            >
+              Abrir na Google Play
+            </a>
 
-          <p className="text-gray-500 text-xs mt-6">
-            Ja tem uma chave? Ela continua funcionando normalmente.{" "}
-            <a href="/painel" className="text-amber-500 hover:underline">Ver minhas licencas</a>
-          </p>
+            <p className="text-gray-400 text-sm mt-6">
+              Todo plano inclui tambem <span className="text-white">1 computador</span> com o MacroForge PC (Windows).{" "}
+              <Link href="/#pc" className="text-amber-500 hover:underline">Saiba mais</Link>
+            </p>
+
+            <p className="text-gray-500 text-xs mt-6">
+              Ja assina? Veja seu plano na sua conta.{" "}
+              <Link href="/painel" className="text-amber-500 hover:underline">Minha conta</Link>
+            </p>
+          </div>
         </div>
       </main>
     );
@@ -179,260 +156,63 @@ export default function PlanosPage() {
 
   return (
     <main className="min-h-screen bg-[#0D1117] text-white pt-20 px-4 pb-12">
-      <div className="max-w-2xl mx-auto">
-        {/* Banner de lancamento */}
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-6 text-center">
-          <p className="text-amber-400 text-sm font-semibold">
-            Promocao de lancamento — oferta por tempo limitado
-          </p>
-        </div>
-
+      <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8">
-          <Image
-            src="/icon.png"
-            alt="MacroForge"
-            width={60}
-            height={60}
-            className="mx-auto mb-4"
-          />
+          <Image src="/icon.png" alt="MacroForge" width={60} height={60} className="mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Escolha seu plano</h1>
-          <p className="text-gray-400 text-sm">
-            Cancele quando quiser. Sem fidelidade.
-          </p>
+          <p className="text-gray-400 text-sm">Mensal. Sem renovacao automatica e sem fidelidade.</p>
         </div>
 
-        {/* Planos */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {PLANOS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPlanoId(p.id)}
-              className={`relative rounded-xl p-5 border text-left transition-all ${
-                planoId === p.id
-                  ? "border-amber-500 bg-amber-500/10 ring-2 ring-amber-500/30"
-                  : "border-gray-700 bg-[#161B22] hover:border-gray-500"
-              }`}
-            >
-              {p.destaque && (
-                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  Popular
-                </div>
-              )}
-              {p.melhorValor && (
-                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-green-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  Melhor valor
-                </div>
-              )}
-              <p className="font-bold">{p.nome}</p>
-              {/* Riscado e preço vêm da MESMA tabela do checkout. Antes eram números escritos
-                  à mão (59,40 e 118,80) que continuariam de pé mesmo depois de a promoção
-                  acabar no Play. A âncora segue sendo "o que custaria pagando mensal pelo
-                  mesmo período" — mesma semântica de antes, agora derivada. */}
-              <p className="text-gray-500 text-sm line-through mt-1">
-                R$ {formatPrice(equivalenteMensal(p.id, 1))}
-              </p>
-              <p className="text-amber-500 font-bold text-2xl">
-                R$ {formatPrice(precoTotal(p.id, 1))}
-              </p>
-              <p className="text-gray-500 text-xs">{p.periodo}</p>
-              {MESES[p.id] > 1 && (
-                <p className="text-gray-400 text-xs mt-1">
-                  R$ {formatPrice(precoTotal(p.id, 1) / MESES[p.id])}/mes
-                </p>
-              )}
-              {economiaPeriodoPct(p.id, 1) > 0 && (
-                <p className="text-green-400 text-xs mt-1">
-                  Economia de {economiaPeriodoPct(p.id, 1)}%
-                </p>
-              )}
-              {p.bonus && (
-                <p className="text-amber-400 text-xs mt-1 font-semibold">
-                  {p.bonus}
-                </p>
-              )}
-            </button>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          {NIVEIS.map((n) => (
+            <CardPlano key={n} nivel={n}>
+              <button
+                onClick={() => comprar(n)}
+                disabled={comprando !== null}
+                className={`w-full mt-5 py-3 rounded-lg font-bold transition-colors ${
+                  comprando !== null
+                    ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                    : n === DESTAQUE
+                      ? "bg-amber-500 hover:bg-amber-600 text-black"
+                      : "border border-gray-600 hover:border-amber-500 text-gray-300"
+                }`}
+              >
+                {comprando === n ? "Redirecionando..." : token ? "Assinar" : "Entrar para assinar"}
+              </button>
+            </CardPlano>
           ))}
         </div>
+        <p className="text-gray-400 text-xs text-center mb-6">{TUDO_INCLUIDO}</p>
 
-        {/* Multichave */}
-        <div className="bg-[#161B22] border border-gray-800 rounded-xl p-6 mb-6">
-          <h2 className="text-sm font-bold text-gray-300 mb-4">
-            Quantidade de chaves
-          </h2>
+        {error && <p className="text-red-400 text-sm mb-4 text-center">{error}</p>}
 
-          {/* ESPELHANDO O APP (2026-08-10). Antes havia o botao de 10 e um CAMPO LIVRE de 1
-              a 25, com escada propria do site (25% em 10+, 30% em 20+) — quantidades que o app
-              nao vende. Agora sao as tres mesmas dos dois lados, e o preco vem da tabela do Play
-              sem nenhuma conta. Revoga o campo livre do ADR-MF-XCROSS-012. */}
-          <div className="flex gap-2 mb-4">
-            {QUANTIDADES.map((qty) => {
-              const d = descontoVolumePct(idPlano, qty);
-              return (
-                <button
-                  key={qty}
-                  onClick={() => setQuantidade(qty)}
-                  className={`flex-1 py-3 rounded-lg border text-center transition-all ${
-                    quantidade === qty
-                      ? "border-amber-500 bg-amber-500/10 text-amber-400"
-                      : "border-gray-700 bg-[#0D1117] text-gray-400 hover:border-gray-500"
-                  }`}
-                >
-                  <span className="block font-bold text-lg">{qty}</span>
-                  <span className={`block text-xs ${d > 0 ? "text-green-400" : "text-gray-600"}`}>
-                    {d > 0 ? `-${d}%` : "—"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+        {!token && (
+          <p className="text-yellow-400 text-xs text-center mb-4">
+            Para assinar, faca{" "}
+            <Link href="/login" className="text-amber-500 hover:underline">login</Link>{" "}
+            ou{" "}
+            <Link href="/cadastro" className="text-amber-500 hover:underline">crie uma conta</Link>.
+          </p>
+        )}
 
-          {/* Resumo do preco */}
-          <div className="bg-[#0D1117] border border-gray-700 rounded-lg p-4">
-            <div className="flex items-baseline justify-between mb-1">
-              <span className="text-gray-400 text-sm">
-                {quantidade} {quantidade === 1 ? "chave" : "chaves"} x{" "}
-                {plano.nome}
-              </span>
-              {(economiaPeriodo > 0 || economiaVolumeValor > 0) && (
-                <span className="text-gray-500 text-sm line-through">
-                  R$ {formatPrice(equivalenteMensalTotal)}
-                </span>
-              )}
-            </div>
-
-            {/* Breakdown de descontos */}
-            {economiaPeriodo > 0 && (
-              <div className="flex justify-between text-xs mt-2">
-                <span className="text-blue-400">
-                  Desconto {plano.nome.toLowerCase()} ({economiaPeriodoPct(idPlano, quantidade)}%)
-                </span>
-                <span className="text-blue-400">
-                  -R$ {formatPrice(economiaPeriodo)}
-                </span>
-              </div>
-            )}
-            {economiaVolumeValor > 0 && (
-              <div className="flex justify-between text-xs mt-1">
-                <span className="text-green-400">
-                  Desconto de volume ({Math.round(desconto * 100)}%)
-                </span>
-                <span className="text-green-400">
-                  -R$ {formatPrice(economiaVolumeValor)}
-                </span>
-              </div>
-            )}
-
-            {(economiaPeriodo > 0 || economiaVolumeValor > 0) && (
-              <div className="border-t border-gray-700 mt-3 pt-3" />
-            )}
-
-            <div className="flex items-baseline justify-between">
-              <span className="text-white font-bold text-lg">Total</span>
-              <span className="text-amber-500 font-bold text-2xl">
-                R$ {formatPrice(totalComDesconto)}
-              </span>
-            </div>
-
-            {economiaTotal > 0 && (
-              <p className="text-green-400 text-xs mt-2 text-right font-semibold">
-                Economia total: R$ {formatPrice(economiaTotal)}
-              </p>
-            )}
-
-            {quantidade > 1 && (
-              <p className="text-gray-500 text-xs mt-1 text-right">
-                R$ {formatPrice(precoUnitario)} por chave
-                {mesesNoPlano > 1 && (
-                  <> · R$ {formatPrice(precoUnitario / mesesNoPlano)}/mes por chave</>
-                )}
-              </p>
-            )}
-          </div>
+        <div className="bg-[#161B22] border border-gray-800 rounded-xl p-5 text-sm text-gray-400 space-y-2">
+          <p>Pagamento seguro via Mercado Pago: <span className="text-white">PIX ou cartao</span>.</p>
+          <p>Comprou o mesmo plano que ja tem? <span className="text-white">Somamos 30 dias</span> ao seu plano.</p>
+          <p>
+            Comprou um plano diferente com outro ainda ativo? Ele <span className="text-white">entra na fila</span> e
+            comeca quando o atual terminar.
+          </p>
+          <p>
+            O plano fica na sua conta: entre no app e no MacroForge PC com o mesmo e-mail e senha do site.{" "}
+            <Link href="/#pc" className="text-amber-500 hover:underline">Sobre o PC</Link>
+          </p>
         </div>
 
-        {/* Email com LED verde */}
-        <div className="bg-[#161B22] border border-gray-800 rounded-xl p-6 mb-6">
-          <label className="block text-sm text-gray-400 mb-2">
-            E-mail da conta
-          </label>
-          <div className="relative">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setEmailConfirmado(false);
-              }}
-              disabled={logado}
-              className={`w-full px-4 py-3 rounded-lg bg-[#0D1117] text-white text-sm focus:outline-none ${
-                emailConfirmado
-                  ? "border-2 border-green-500 shadow-[0_0_10px_rgba(74,222,128,0.3)]"
-                  : "border border-gray-700 focus:border-amber-500"
-              } ${logado ? "opacity-80" : ""}`}
-            />
-            {emailConfirmado && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
-                <span className="text-green-400 text-xs font-medium">
-                  Confirmado
-                </span>
-              </div>
-            )}
-          </div>
-          {emailConfirmado && (
-            <p className="text-green-400 text-xs mt-2">
-              {quantidade === 1
-                ? "A licenca sera vinculada a este e-mail. Correto?"
-                : `As ${quantidade} chaves serao enviadas para este e-mail.`}
-            </p>
-          )}
-          {!logado && (
-            <p className="text-yellow-400 text-xs mt-2">
-              Voce precisa fazer{" "}
-              <a href="/login" className="text-amber-500 hover:underline">
-                login
-              </a>{" "}
-              ou{" "}
-              <a href="/cadastro" className="text-amber-500 hover:underline">
-                criar uma conta
-              </a>{" "}
-              primeiro.
-            </p>
-          )}
-
-          {error && (
-            <p className="text-red-400 text-sm mt-3 text-center">{error}</p>
-          )}
-
-          <button
-            onClick={handleComprar}
-            disabled={loading || !logado}
-            className={`w-full mt-4 py-4 rounded-xl font-bold text-lg transition-colors ${
-              loading || !logado
-                ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                : "bg-amber-500 hover:bg-amber-600 text-black"
-            }`}
-          >
-            {loading
-              ? "Redirecionando..."
-              : !logado
-                ? "Faca login para continuar"
-                : quantidade === 1
-                  ? "Pagar com Mercado Pago"
-                  : `Comprar ${quantidade} chaves — R$ ${formatPrice(totalComDesconto)}`}
-          </button>
-
-          <p className="text-gray-500 text-xs text-center mt-3">
-            Pagamento seguro via Mercado Pago. Aceitamos PIX, cartao e boleto.
+        <div className="flex items-center justify-center gap-2 mt-4 py-3 rounded-lg bg-green-500/5 border border-green-500/20">
+          <span className="text-green-400 text-lg">&#10003;</span>
+          <p className="text-green-400 text-xs font-medium">
+            7 dias de garantia — nao gostou, devolvemos seu dinheiro
           </p>
-
-          {/* Garantia */}
-          <div className="flex items-center justify-center gap-2 mt-4 py-3 rounded-lg bg-green-500/5 border border-green-500/20">
-            <span className="text-green-400 text-lg">&#10003;</span>
-            <p className="text-green-400 text-xs font-medium">
-              7 dias de garantia — nao gostou, devolvemos seu dinheiro
-            </p>
-          </div>
         </div>
       </div>
     </main>

@@ -9,7 +9,7 @@ export default function Sucesso() {
           Pagamento aprovado!
         </h1>
         <p className="text-gray-400 mb-2">
-          Sua chave de licenca foi gerada e sera enviada para o seu e-mail em instantes.
+          Seu plano foi liberado na sua conta. Entre no app ou no PC com o mesmo e-mail e senha do site. A confirmacao chega no seu e-mail em instantes.
         </p>
         <p className="text-gray-500 text-sm mb-8">
           Verifique tambem a caixa de spam.

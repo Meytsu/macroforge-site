@@ -1,17 +1,25 @@
+// ============================================================
+// POST /api/checkout — monta a tela de pagamento do Mercado Pago (Checkout Pro) para um plano.
+//
+// Reescrito em 2026-11-22 (ISSUE-MF-156, ADR-MF-XCROSS-022). Antes vendia CHAVES por quantidade; agora vende o
+// PLANO DA CONTA: Pro / Mega / Ultra, só mensal.
+//
+// Corpo: { nivel: "pro" | "mega" | "ultra" }      Header: Authorization: Bearer <crachá do login>
+//
+// O QUE ESTA ROTA NUNCA FAZ
+//   1. Ler o cliente do corpo. Vem do CRACHÁ assinado (como /api/painel e /api/play-purchase-verify).
+//   2. Ler o preço do corpo. Vem de `precoNivel` (app/lib/precos.ts) — a mesma função que a tela mostra e que o
+//      /api/webhook usa para conferir o valor pago.
+//   3. Conceder qualquer coisa. Aqui não houve pagamento: quem concede é o /api/webhook, depois de perguntar ao
+//      Mercado Pago se o pagamento foi aprovado.
+// ============================================================
+
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Preference } from "mercadopago";
-
-// 🔴 A TABELA DE PREÇOS SAIU DAQUI em 2026-08-09. Agora vem de `app/lib/precos.ts`, que
-// espelha o Google Play — e a página /planos lê a MESMA função.
-//
-// O que havia aqui era uma segunda tabela, independente da tela e independente do Play:
-// `price` (9,90 / 47,90 / 79,90) mais uma escada de 10%/15%. Resultado medido: divergência em
-// 6 das 9 combinações, e em duas delas o site cobrava MAIS CARO que o app pelo mesmo produto
-// (mensal x5: Play 41,90, site 42,10 · semestral x3: Play 128,90, site 129,33).
-//
-// Não adicione preço aqui de novo. Preço é dado, e mora num lugar só.
+import { clienteIdDoHeader } from "@/app/api/_lib/auth";
 import {
-  precoTotal, NOME_PLANO, ehPlanoValido, ehQuantidadeValida, QUANTIDADES,
+  precoNivel, ehNivelValido, NOME_NIVEL, APARELHOS_DO_NIVEL,
   VENDA_PELO_SITE_ATIVA, URL_PLAY_STORE,
 } from "@/app/lib/precos";
 
@@ -20,11 +28,8 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
 
 export async function POST(req: NextRequest) {
   try {
-    // VENDA PELO SITE DESLIGADA (2026-08-10). Checado ANTES de qualquer coisa — antes de ler o
-    // corpo, antes de falar com o Mercado Pago, antes de tocar no banco.
-    //
-    // Esconder o link de /planos não bastaria: a URL continuaria viva e um POST direto aqui
-    // criaria preferência de pagamento. O interruptor mora em `lib/precos.ts` e vale pros dois.
+    // VENDA PELO SITE DESLIGADA. Checado ANTES de qualquer coisa — antes de ler o corpo, antes de falar com o
+    // Mercado Pago, antes de tocar no banco. Esconder o botão de /planos não bastaria: a URL continuaria viva.
     if (!VENDA_PELO_SITE_ATIVA) {
       return NextResponse.json(
         {
@@ -38,139 +43,79 @@ export async function POST(req: NextRequest) {
 
     const accessToken = process.env.MP_ACCESS_TOKEN;
     if (!accessToken) {
-      return NextResponse.json({ error: "Token do MP nao configurado" }, { status: 500 });
+      return NextResponse.json({ error: "Pagamento indisponivel no momento." }, { status: 500 });
     }
-
-    const body = await req.json();
-    const { plano, email, nome, whatsapp, pais, estado, cidade, codigo_pais } = body;
-    // RECUSA em vez de normalizar (espelhamento de 2026-08-10). Antes era
-    // `Math.max(1, Math.min(25, ...))`, que ACEITAVA qualquer número e o encaixava numa faixa.
-    // Com só três quantidades vendáveis, encaixar seria escolher um preço no lugar do cliente:
-    // um POST com `quantidade: 7` viraria cobrança de 5 chaves entregando 7, ou o contrário.
-    // Recusar é a única resposta honesta, e é barato — a tela só oferece 1, 3 e 5.
-    const quantidade = parseInt(body.quantidade, 10);
-    if (!ehQuantidadeValida(quantidade)) {
-      return NextResponse.json(
-        { error: `Quantidade invalida. Escolha ${QUANTIDADES.join(", ")} chaves.` },
-        { status: 400 }
-      );
-    }
-
-    if (!ehPlanoValido(plano)) {
-      return NextResponse.json({ error: "Plano invalido" }, { status: 400 });
-    }
-
-    if (!email || !email.includes("@")) {
-      return NextResponse.json({ error: "E-mail invalido" }, { status: 400 });
-    }
-
-    // O MESMO número que a tela /planos mostrou. Uma função, dois consumidores — é isto que
-    // torna "o preço da tela difere do cobrado" impossível, em vez de improvável.
-    const total = precoTotal(plano, quantidade);
-
-    // ============================================================
-    // SÓ COMPRA QUEM JÁ TEM CONTA (decisão do Henrique, 2026-08-09 — ISSUE-MF-140)
-    // ============================================================
-    // Esta rota NÃO cobra nada: ela só monta a tela de pagamento do Mercado Pago. Mas
-    // gravava cliente no banco antes disso, sem login e sem pagamento — uma segunda porta
-    // de criação de contas em massa, que a regra de firewall (presa em `/api/registro`)
-    // não cobre.
-    //
-    // Agora ela EXIGE conta existente. Fecha a porta na origem, em vez de tentar filtrar
-    // quem passa por ela.
-    //
-    // Por que o custo é quase zero: a tela de planos já obrigava login
-    // (`planos/page.tsx` → `if (!logado) router.push("/login")`) e **nunca enviava `nome`**,
-    // então o bloco antigo de criação era inalcançável pelo site. Só abria por chamada
-    // direta à API — isto é, só pra quem estava abusando.
-    //
-    // ⚠️ A checagem tem que ser AQUI, no servidor. A do front é conveniência: qualquer um
-    // chama a rota direto e pula o `router.push`.
     if (!SUPABASE_URL || !SUPABASE_KEY) {
-      // Sem banco não dá pra provar que a conta existe. Recusa em vez de deixar passar —
-      // um portão que "libera quando não consegue checar" não é um portão.
+      // Sem banco não dá pra provar que a conta existe — recusa em vez de deixar passar.
       console.error("checkout: Supabase nao configurado; recusando por seguranca");
       return NextResponse.json({ error: "Servico indisponivel" }, { status: 503 });
     }
 
-    {
-      const headers = {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      };
-
-      const checkRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}`,
-        { headers }
+    // 1) Quem está comprando — do crachá, nunca do corpo (ISSUE-MF-140: só compra quem tem conta).
+    const clienteId = await clienteIdDoHeader(req.headers.get("authorization"));
+    if (!clienteId) {
+      return NextResponse.json(
+        { error: "Sessao expirada. Faca login novamente.", precisaLogin: true },
+        { status: 401 }
       );
-      const existing = await checkRes.json();
-
-      if (!Array.isArray(existing) || existing.length === 0) {
-        return NextResponse.json(
-          {
-            error: "Crie sua conta antes de comprar.",
-            precisaCadastro: true,
-          },
-          { status: 403 }
-        );
-      }
-
-      // NOTA: não exigimos `email_confirmado` aqui, de propósito. Confirmar é portão só
-      // do TRIAL (o que tem valor pra quem abusa). Quem está com o cartão na mão não
-      // esbarra em burocracia — e pagar já confirma, pelo /api/webhook.
-
-      // A conta existe. Atualiza os dados opcionais que vieram no corpo, se vieram.
-      //
-      // ⚠️ `email_confirmado` NÃO entra neste PATCH, e é deliberado (ISSUE-MF-133): aqui
-      // ainda não houve pagamento nenhum. Marcar `true` daria confirmação de graça a quem
-      // só CHAMA a rota. Quem marca é o /api/webhook, no `approved`.
-      //
-      // ⚠️ E NÃO existe mais ramo de criação. Se você veio "consertar" um erro de conta
-      // inexistente adicionando um POST aqui, pare: era exatamente o buraco da
-      // ISSUE-MF-140. O caminho certo é o usuário se cadastrar.
-      if (nome) {
-        const clienteData = {
-          nome,
-          email,
-          whatsapp: whatsapp || null,
-          pais: pais || null,
-          estado: estado || null,
-          cidade: cidade || null,
-          codigo_pais: codigo_pais || null,
-        };
-
-        await fetch(
-          `${SUPABASE_URL}/rest/v1/clientes?email=eq.${encodeURIComponent(email)}`,
-          { method: "PATCH", headers, body: JSON.stringify(clienteData) }
-        );
-      }
     }
 
+    // 2) O que está comprando — só o nível; o preço é do servidor.
+    const body = await req.json().catch(() => ({}));
+    const nivel = body?.nivel;
+    if (!ehNivelValido(nivel)) {
+      return NextResponse.json({ error: "Plano invalido. Escolha Pro, Mega ou Ultra." }, { status: 400 });
+    }
+    const preco = precoNivel(nivel);
+
+    // 3) A conta existe? (o crachá vale 30 dias; a conta pode ter sido apagada nesse meio-tempo)
+    const cliRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/clientes?id=eq.${encodeURIComponent(clienteId)}&select=id,nome,email`,
+      {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        cache: "no-store",
+      }
+    );
+    if (!cliRes.ok) {
+      console.error("checkout: falha ao ler cliente", cliRes.status);
+      return NextResponse.json({ error: "Servico indisponivel" }, { status: 503 });
+    }
+    const clientes = await cliRes.json();
+    if (!Array.isArray(clientes) || clientes.length === 0) {
+      return NextResponse.json({ error: "Crie sua conta antes de comprar.", precisaCadastro: true }, { status: 403 });
+    }
+    const cliente = clientes[0] as { id: string; nome?: string | null; email: string };
+
+    // 4) A preferência no Mercado Pago.
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const local = siteUrl.includes("localhost");
 
-    const client = new MercadoPagoConfig({ accessToken });
-    const preference = new Preference(client);
+    // Um id por PEDIDO (não por cliente): o mesmo cliente pode abrir duas compras. Só para rastrear no painel do MP —
+    // a idempotência da concessão é pelo id do PAGAMENTO, no banco (sql/15).
+    const externalReference = `mf-${nivel}-${randomUUID()}`;
 
-    const titleSuffix = quantidade > 1 ? ` (${quantidade} chaves)` : "";
-
+    const preference = new Preference(new MercadoPagoConfig({ accessToken }));
     const result = await preference.create({
       body: {
         items: [
           {
-            id: `${plano}_x${quantidade}`,
-            title: `${NOME_PLANO[plano]}${titleSuffix}`,
+            id: `${nivel}-mensal`,
+            title: `MacroForge ${NOME_NIVEL[nivel]} — mensal (${APARELHOS_DO_NIVEL[nivel]} aparelhos + 1 PC)`,
             quantity: 1,
-            unit_price: total,
+            unit_price: preco,
             currency_id: "BRL",
           },
         ],
-        payer: {
-          email: email,
-          name: nome || undefined,
+        payer: { email: cliente.email, name: cliente.nome || undefined },
+        // PIX e cartão (decisão do Henrique, 2026-11-22). Fora: boleto ("ticket") e lotérica/caixa ("atm") — demoram
+        // dias para confirmar e o plano ficaria "pendente".
+        payment_methods: {
+          excluded_payment_types: [{ id: "ticket" }, { id: "atm" }],
+          installments: 1,
         },
-        ...(siteUrl.includes("localhost") ? {} : {
+        external_reference: externalReference,
+        statement_descriptor: "MACROFORGE",
+        ...(local ? {} : {
           back_urls: {
             success: `${siteUrl}/sucesso`,
             failure: `${siteUrl}/falha`,
@@ -178,14 +123,12 @@ export async function POST(req: NextRequest) {
           },
           auto_return: "approved" as const,
         }),
-        notification_url: siteUrl.includes("localhost")
-          ? undefined
-          : `${siteUrl}/api/webhook`,
+        notification_url: local ? undefined : `${siteUrl}/api/webhook`,
+        // O webhook lê DAQUI quem e o quê (e confere o valor pago contra precoNivel(nivel)).
         metadata: {
-          plano: plano,
-          email: email,
-          nome: nome || "",
-          quantidade: quantidade,
+          cliente_id: cliente.id,
+          nivel,
+          duracao: "mensal",
         },
       },
     });
@@ -196,11 +139,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Erro ao criar checkout:", error);
-    const message = error instanceof Error
-      ? error.message
-      : typeof error === "object" && error !== null
-        ? JSON.stringify(error)
-        : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao iniciar o pagamento. Tente novamente." }, { status: 500 });
   }
 }
