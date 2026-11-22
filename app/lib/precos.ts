@@ -33,8 +33,11 @@
  *   2. testar com usuários de teste do Mercado Pago (sem dinheiro), inclusive PIX, mesmo plano (soma 30 dias) e
  *      plano diferente (fila);
  *   3. uma compra real de ponta a ponta (Pro mensal) — e conferir a licença e o e-mail.
+ *
+ * ✅ LIGADO em 2026-11-22 (Henrique: "pode ligar"): sql/15 aplicado; compra real por PIX (pagamento 191124242194, a
+ * R$ 1,00 do teste controlado) concedida pelo webhook → recibo "somou" + licença Pro de 30 dias na fila.
  */
-export const VENDA_PELO_SITE_ATIVA = false;
+export const VENDA_PELO_SITE_ATIVA = true;
 
 /** Ficha do app na Play Store — pra onde mandar quem chega em /planos com a venda desligada. */
 export const URL_PLAY_STORE =
