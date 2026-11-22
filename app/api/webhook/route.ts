@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import { Resend } from "resend";
 import { rpc } from "@/app/api/_lib/rpc";
+import { PRECO_TESTE, ehEmailTeste } from "@/app/lib/teste-mp";
 import {
   precoNivel, ehNivelValido, NOME_NIVEL, APARELHOS_DO_NIVEL, type NivelId,
 } from "@/app/lib/precos";
@@ -153,7 +154,10 @@ export async function POST(req: NextRequest) {
     else if (duracao !== "mensal") motivo = `duracao inesperada: ${String(duracao)}`;
     else if (moeda !== "BRL") motivo = `moeda inesperada: ${String(moeda)}`;
     else if (!Number.isFinite(valorPago) || Math.round(valorPago * 100) !== Math.round(precoNivel(nivelBruto) * 100)) {
-      motivo = `valor pago ${valorPago} diferente do preco ${precoNivel(nivelBruto)} (${nivelBruto})`;
+      // o preço de teste (R$ 1,00) só vale para a conta de um e-mail da lista de teste (lib/teste-mp)
+      const ehTeste = Math.round(valorPago * 100) === Math.round(PRECO_TESTE * 100)
+        && ehEmailTeste(await emailDoCliente(clienteId));
+      if (!ehTeste) motivo = `valor pago ${valorPago} diferente do preco ${precoNivel(nivelBruto)} (${nivelBruto})`;
     }
 
     if (motivo) {
