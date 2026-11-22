@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const { senha_hash, ...clienteSeguro } = cliente;
 
     const licRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/licencas?cliente_id=eq.${cliente.id}&order=criado_em.desc&select=chave,plano,valor,status,device_id,data_inicio,data_expiracao`,
+      `${SUPABASE_URL}/rest/v1/licencas?cliente_id=eq.${cliente.id}&order=criado_em.desc&select=chave,plano,valor,status,device_id,data_inicio,data_expiracao,nivel,origem,max_dispositivos,auto_renews`,
       { headers }
     );
     const licencas = await licRes.json();

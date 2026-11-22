@@ -59,7 +59,7 @@ function CardPlano({ nivel, children }: { nivel: NivelId; children?: React.React
 }
 
 const TUDO_INCLUIDO =
-  "Todo plano inclui tudo: todas as DGs, TG, Colecao e Loja de DP, no app e no PC. O plano so muda quantos aparelhos usam ao mesmo tempo.";
+  "Todo plano inclui tudo: todas as DGs e a TG, no app e no PC; Colecao e Loja de DP no PC (no app, em breve). O plano so muda quantos aparelhos usam ao mesmo tempo.";
 
 export default function PlanosPage() {
   const router = useRouter();

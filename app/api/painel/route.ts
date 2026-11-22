@@ -15,6 +15,10 @@ const headers = {
  *
  * Retorna dados do cliente + todas as licencas.
  *
+ * ADR-MF-XCROSS-022 (2026-11-22): devolve também nivel/origem/max_dispositivos/auto_renews, para o painel mostrar o
+ * PLANO da conta (e a licença NA FILA: data_inicio no futuro). A `chave` continua na resposta só porque o
+ * /api/reset-device das chaves antigas identifica a licença por ela — o painel não a exibe.
+ *
  * SEGURANCA (MF-103 Bloqueador 1): o cliente e derivado do CRACHA assinado
  * (header `Authorization: Bearer <token>`), NUNCA de um parametro de e-mail.
  * Antes a rota aceitava `?email=` sem autenticacao e devolvia nome/telefone/
@@ -46,7 +50,7 @@ export async function GET(req: NextRequest) {
 
     // Busca licencas
     const licRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/licencas?cliente_id=eq.${cliente.id}&order=criado_em.desc&select=chave,plano,valor,status,device_id,data_inicio,data_expiracao`,
+      `${SUPABASE_URL}/rest/v1/licencas?cliente_id=eq.${cliente.id}&order=criado_em.desc&select=chave,plano,valor,status,device_id,data_inicio,data_expiracao,nivel,origem,max_dispositivos,auto_renews`,
       { headers }
     );
     const licencas = await licRes.json();

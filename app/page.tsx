@@ -141,7 +141,7 @@ export default function Home() {
               Baixar para Windows
             </a>
             <p className="text-gray-500 text-xs mt-3">
-              Versão {PC_VERSAO} · Windows 10 ou 11 (64 bits) · emulador MSI App Player ou BlueStacks 5 · internet
+              Versão {PC_VERSAO} · Windows 10 ou 11 (64 bits) · emulador MSI App Player, BlueStacks 5 ou LDPlayer 9 · internet
             </p>
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function Home() {
       <section id="planos" className="px-6 py-16 max-w-5xl mx-auto">
         <h2 className="text-3xl font-bold text-center mb-4">Planos</h2>
         <p className="text-gray-400 text-center mb-10 max-w-2xl mx-auto">
-          Todo plano inclui tudo: todas as DGs, TG, Coleção e Loja de DP, no app e no PC. O plano só muda quantos
+          Todo plano inclui tudo: todas as DGs e a TG, no app e no PC; Coleção e Loja de DP no PC (no app, em breve). O plano só muda quantos
           aparelhos usam ao mesmo tempo. Teste grátis de 3 dias com tudo liberado (1 celular + 1 PC).
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">

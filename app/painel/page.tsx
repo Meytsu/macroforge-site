@@ -1,20 +1,28 @@
 "use client";
 
 import { useState, useEffect, useMemo, useSyncExternalStore } from "react";
-import { URL_PLAY_STORE } from "@/app/lib/precos";
+import { NOME_NIVEL, URL_PLAY_STORE } from "@/app/lib/precos";
 import { URL_INSTALADOR_PC } from "@/app/lib/pc";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 
+// ADR-MF-XCROSS-022 (2026-11-22): o painel mostra o PLANO da conta (nível, aparelhos + 1 PC, validade, origem), não
+// chaves. A `chave` ainda vem do /api/painel porque o /api/reset-device das licenças antigas a usa, mas NÃO é exibida
+// (nas licenças novas ela é um identificador interno). Os campos de plano são opcionais: a sessão gravada por um
+// login antigo no sessionStorage pode não tê-los até o GET /api/painel responder.
 interface Licenca {
   chave: string;
   plano: string;
   valor: number;
   status: string;
   device_id: string | null;
-  data_inicio: string;
+  data_inicio: string | null;
   data_expiracao: string;
+  nivel?: string | null;
+  origem?: string | null;
+  max_dispositivos?: number | null;
+  auto_renews?: boolean | null;
 }
 
 interface Cliente {
@@ -44,22 +52,66 @@ function formatarData(data: string): string {
   return new Date(data).toLocaleDateString("pt-BR");
 }
 
-function StatusBadge({ status, dataExp }: { status: string; dataExp: string }) {
-  const expirada = diasRestantes(dataExp) === 0 && status === "ativa";
-  const statusFinal = expirada ? "expirada" : status;
+function formatarDiaMes(data: string): string {
+  return new Date(data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
 
-  const cores: Record<string, string> = {
-    ativa: "bg-green-500/20 text-green-400 border-green-500/30",
-    expirada: "bg-red-500/20 text-red-400 border-red-500/30",
-    cancelada: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-    suspensa: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  };
+/** Licença paga que ainda não começou: plano diferente comprado no site espera o atual acabar (sql/15). */
+function estaNaFila(l: Licenca): boolean {
+  return !!l.data_inicio && new Date(l.data_inicio).getTime() > new Date().getTime();
+}
 
-  return (
-    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${cores[statusFinal] || cores.cancelada}`}>
-      {statusFinal.charAt(0).toUpperCase() + statusFinal.slice(1)}
-    </span>
-  );
+function vigente(l: Licenca): boolean {
+  return l.status === "ativa" && diasRestantes(l.data_expiracao) > 0;
+}
+
+function nomeDoPlano(l: Licenca): string {
+  const n = l.nivel ?? (l.plano === "trial" ? "trial" : null);
+  if (n && n in NOME_NIVEL) return NOME_NIVEL[n as keyof typeof NOME_NIVEL];
+  return l.plano ? l.plano.charAt(0).toUpperCase() + l.plano.slice(1) : "Plano";
+}
+
+function textoAparelhos(l: Licenca): string {
+  const n = l.max_dispositivos ?? 1;
+  const trial = l.nivel === "trial" || l.plano === "trial";
+  const app = n === 1 ? (trial ? "1 celular" : "1 aparelho") : `${n} aparelhos`;
+  return `${app} ao mesmo tempo + 1 PC`;
+}
+
+const ORIGENS: Record<string, string> = {
+  play_billing: "Google Play",
+  mercado_pago: "Site (Mercado Pago)",
+  admin: "Liberado pelo suporte",
+  trial: "Teste grátis",
+};
+
+function textoOrigem(l: Licenca): string | null {
+  return l.origem ? ORIGENS[l.origem] ?? l.origem : null;
+}
+
+function StatusBadge({ licenca }: { licenca: Licenca }) {
+  let texto: string;
+  let cor: string;
+  if (vigente(licenca)) {
+    if (estaNaFila(licenca)) {
+      texto = `Na fila — começa em ${formatarDiaMes(licenca.data_inicio!)}`;
+      cor = "bg-sky-500/20 text-sky-400 border-sky-500/30";
+    } else {
+      texto = "Ativo";
+      cor = "bg-green-500/20 text-green-400 border-green-500/30";
+    }
+  } else if (licenca.status === "ativa" || licenca.status === "expirada") {
+    texto = "Expirado";
+    cor = "bg-red-500/20 text-red-400 border-red-500/30";
+  } else if (licenca.status === "suspensa") {
+    texto = "Suspenso";
+    cor = "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+  } else {
+    texto = licenca.status === "cancelada" ? "Cancelado" : licenca.status;
+    cor = "bg-gray-500/20 text-gray-400 border-gray-500/30";
+  }
+
+  return <span className={`px-3 py-1 rounded-full text-xs font-bold border ${cor}`}>{texto}</span>;
 }
 
 // O sessionStorage não avisa mudanças da própria aba: quem grava aqui (logout, renomear, trial…) também chama
@@ -119,8 +171,23 @@ export default function PainelPage() {
   }
 
   const { cliente, licencas } = session;
-  const ativas = licencas.filter(l => l.status === "ativa" && diasRestantes(l.data_expiracao) > 0);
-  const outras = licencas.filter(l => l.status !== "ativa" || diasRestantes(l.data_expiracao) === 0);
+  const naFila = licencas
+    .filter(l => vigente(l) && estaNaFila(l))
+    .sort((x, y) => new Date(x.data_inicio!).getTime() - new Date(y.data_inicio!).getTime());
+  const ativos = licencas.filter(l => vigente(l) && !estaNaFila(l));
+  const historico = licencas.filter(l => !vigente(l));
+
+  // Reset do aparelho de uma licença ANTIGA (por chave, 1 aparelho): o servidor já confirmou (data.ok); aqui só se
+  // grava a mudança localmente. 🔴 2026-08-09: aqui havia um POST no /api/login com a senha "_skip_" que contava como
+  // tentativa de invasão e bloqueava a conta no quinto reset — não volta. Para rebuscar do servidor de verdade, o
+  // caminho é o GET /api/painel com o crachá, como na abertura da tela.
+  function aparelhoLiberado(lic: Licenca) {
+    if (!session) return;
+    const newLicencas = licencas.map(l => (l.chave === lic.chave ? { ...l, device_id: null } : l));
+    const newSession = { ...session, licencas: newLicencas };
+    setSession(newSession);
+    sessionStorage.setItem("macroforge_session", JSON.stringify(newSession));
+  }
 
   return (
     <main className="min-h-screen bg-[#0D1117] text-white pt-20 px-4 pb-12">
@@ -142,94 +209,50 @@ export default function PainelPage() {
           </button>
         </div>
 
-        {/* Resumo */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="bg-[#161B22] border border-gray-800 rounded-xl p-4 text-center">
-            <p className="text-3xl font-bold text-amber-500">{ativas.length}</p>
-            <p className="text-gray-400 text-sm">Licencas ativas</p>
-          </div>
-          <div className="bg-[#161B22] border border-gray-800 rounded-xl p-4 text-center">
-            <p className="text-3xl font-bold">{licencas.length}</p>
-            <p className="text-gray-400 text-sm">Total de licencas</p>
-          </div>
-        </div>
-
-        {/* Licenças ativas */}
-        {ativas.length > 0 && (
+        {/* Seu plano (ADR-MF-XCROSS-022): o que vale agora + o que está na fila */}
+        {(ativos.length > 0 || naFila.length > 0) && (
           <div className="mb-8">
-            <h2 className="text-lg font-bold mb-4">Licencas ativas</h2>
+            <h2 className="text-lg font-bold mb-4">Seu plano</h2>
             <div className="space-y-4">
-              {ativas.map(lic => (
-                <LicencaCard key={lic.chave} licenca={lic} email={cliente.email} onReset={() => {
-                  // 🔴 REMOVIDO em 2026-08-09 — aqui havia um POST no /api/login com a
-                  // senha literal "_skip_", sob o comentário "Recarrega dados do servidor".
-                  //
-                  // Ele não recarregava nada (a resposta era descartada, sem await), e a
-                  // senha falsa caía no ramo de senha errada do login, que chama
-                  // `registrarTentativa(email, false)`. Ou seja: **cada reset de dispositivo
-                  // contava como uma tentativa de invasão**. No quinto, a conta era
-                  // bloqueada por 15 minutos — e o alvo natural é o cliente com VÁRIAS
-                  // chaves, que troca de celular e libera todos os aparelhos de uma vez.
-                  //
-                  // Achado pelo Henrique. Nada entra no lugar: o reset muda só o
-                  // `device_id`, o servidor já confirmou (data.ok), e as linhas abaixo já
-                  // gravam exatamente essa mudança. Pra rebuscar do servidor de verdade, o
-                  // caminho é o GET /api/painel com o crachá, como na abertura da tela.
-                  // Atualiza localmente
-                  const updated = { ...lic, device_id: null };
-                  const newLicencas = licencas.map(l => l.chave === lic.chave ? updated : l);
-                  const newSession = { ...session, licencas: newLicencas };
-                  setSession(newSession);
-                  sessionStorage.setItem("macroforge_session", JSON.stringify(newSession));
-                }} />
+              {[...ativos, ...naFila].map(lic => (
+                <PlanoCard key={lic.chave} licenca={lic} email={cliente.email} onReset={() => aparelhoLiberado(lic)} />
               ))}
             </div>
+            {ativos.length === 0 && (
+              <p className="text-gray-400 text-sm mt-3">
+                Nenhum plano valendo agora — o da fila começa sozinho na data indicada.
+              </p>
+            )}
           </div>
         )}
 
-        {/* Licenças expiradas/canceladas */}
-        {outras.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-bold mb-4 text-gray-400">Historico</h2>
-            <div className="space-y-4">
-              {outras.map(lic => (
-                <LicencaCard key={lic.chave} licenca={lic} email={cliente.email} onReset={() => {
-                  // 🔴 REMOVIDO em 2026-08-09 — aqui havia um POST no /api/login com a
-                  // senha literal "_skip_", sob o comentário "Recarrega dados do servidor".
-                  //
-                  // Ele não recarregava nada (a resposta era descartada, sem await), e a
-                  // senha falsa caía no ramo de senha errada do login, que chama
-                  // `registrarTentativa(email, false)`. Ou seja: **cada reset de dispositivo
-                  // contava como uma tentativa de invasão**. No quinto, a conta era
-                  // bloqueada por 15 minutos — e o alvo natural é o cliente com VÁRIAS
-                  // chaves, que troca de celular e libera todos os aparelhos de uma vez.
-                  //
-                  // Achado pelo Henrique. Nada entra no lugar: o reset muda só o
-                  // `device_id`, o servidor já confirmou (data.ok), e as linhas abaixo já
-                  // gravam exatamente essa mudança. Pra rebuscar do servidor de verdade, o
-                  // caminho é o GET /api/painel com o crachá, como na abertura da tela.
-                  // Atualiza localmente
-                  const updated = { ...lic, device_id: null };
-                  const newLicencas = licencas.map(l => l.chave === lic.chave ? updated : l);
-                  const newSession = { ...session, licencas: newLicencas };
-                  setSession(newSession);
-                  sessionStorage.setItem("macroforge_session", JSON.stringify(newSession));
-                }} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Sem licenças */}
-        {licencas.length === 0 && (
-          <div className="bg-[#161B22] border border-gray-800 rounded-xl p-8 text-center">
-            <p className="text-gray-400 mb-4">Voce ainda nao tem nenhuma licenca.</p>
+        {/* Sem plano valendo */}
+        {ativos.length === 0 && naFila.length === 0 && (
+          <div className="mb-8 bg-[#161B22] border border-gray-800 rounded-xl p-8 text-center">
+            <p className="text-gray-400 mb-4">
+              {licencas.length === 0 ? "Voce ainda nao tem nenhum plano." : "Voce nao tem nenhum plano ativo agora."}
+            </p>
             <Link
               href="/planos"
               className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-6 py-3 rounded-xl transition-colors"
             >
-              Comprar agora
+              Ver planos
             </Link>
+          </div>
+        )}
+
+        {/* Aparelhos usando a conta agora (vagas) — o mesmo "Meu plano" do app (/api/aparelhos) */}
+        {session.token && <AparelhosConectados token={session.token} />}
+
+        {/* Planos que já acabaram */}
+        {historico.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-bold mb-4 text-gray-400">Historico</h2>
+            <div className="space-y-4">
+              {historico.map(lic => (
+                <PlanoCard key={lic.chave} licenca={lic} email={cliente.email} onReset={() => aparelhoLiberado(lic)} />
+              ))}
+            </div>
           </div>
         )}
 
@@ -258,7 +281,7 @@ export default function PainelPage() {
           <div className="flex-1">
             <h3 className="font-bold mb-1">MacroForge PC (Windows)</h3>
             <p className="text-gray-400 text-sm">
-              Windows 10 ou 11 (64 bits) com o MSI App Player e o ADB ligado. Entre no programa com esta mesma conta.
+              Windows 10 ou 11 (64 bits) com o MSI App Player, o BlueStacks 5 ou o LDPlayer 9 (com o ADB ligado). Entre no programa com esta mesma conta.
             </p>
           </div>
           <a
@@ -270,13 +293,13 @@ export default function PainelPage() {
         </div>
 
         {/* Botão comprar mais */}
-        {licencas.length > 0 && (
+        {(ativos.length > 0 || naFila.length > 0) && (
           <div className="text-center">
             <Link
               href="/planos"
               className="inline-block bg-amber-500 hover:bg-amber-600 text-black font-bold px-6 py-3 rounded-xl transition-colors"
             >
-              Comprar nova licenca
+              Renovar ou trocar de plano
             </Link>
           </div>
         )}
@@ -336,13 +359,14 @@ export default function PainelPage() {
   );
 }
 
-function LicencaCard({ licenca, email, onReset }: { licenca: Licenca; email: string; onReset: () => void }) {
-  const [mostrarChave, setMostrarChave] = useState(false);
+function PlanoCard({ licenca, email, onReset }: { licenca: Licenca; email: string; onReset: () => void }) {
   const [resetando, setResetando] = useState(false);
   const [pedindoSenha, setPedindoSenha] = useState(false);
   const [senhaReset, setSenhaReset] = useState("");
   const [resetMsg, setResetMsg] = useState("");
   const dias = diasRestantes(licenca.data_expiracao);
+  const fila = vigente(licenca) && estaNaFila(licenca);
+  const origem = textoOrigem(licenca);
 
   async function handleReset() {
     if (!pedindoSenha) {
@@ -378,93 +402,179 @@ function LicencaCard({ licenca, email, onReset }: { licenca: Licenca; email: str
 
   return (
     <div className="bg-[#161B22] border border-gray-800 rounded-xl p-5">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-3">
-          <StatusBadge status={licenca.status} dataExp={licenca.data_expiracao} />
-          <span className="text-sm text-gray-400 capitalize">{licenca.plano}</span>
+          <span className="text-base font-bold text-amber-500">{nomeDoPlano(licenca)}</span>
+          <StatusBadge licenca={licenca} />
         </div>
-        <span className="text-sm font-bold">R$ {Number(licenca.valor).toFixed(2).replace(".", ",")}</span>
+        {origem && <span className="text-xs text-gray-500">{origem}</span>}
       </div>
 
-      {/* Chave */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs text-gray-500">Chave:</span>
-        <code className="bg-[#0D1117] px-3 py-1 rounded text-sm font-mono">
-          {mostrarChave ? licenca.chave : "MF-****-****-****"}
-        </code>
-        <button
-          onClick={() => setMostrarChave(!mostrarChave)}
-          className="text-amber-500 text-xs hover:underline"
-        >
-          {mostrarChave ? "Ocultar" : "Mostrar"}
-        </button>
-        {mostrarChave && (
-          <button
-            onClick={() => navigator.clipboard.writeText(licenca.chave)}
-            className="text-gray-400 text-xs hover:text-white"
-          >
-            Copiar
-          </button>
-        )}
-      </div>
+      <p className="text-sm text-gray-300 mb-3">{textoAparelhos(licenca)}</p>
 
       {/* Detalhes */}
       <div className="grid grid-cols-3 gap-4 text-xs text-gray-400">
         <div>
-          <p className="text-gray-600">Inicio</p>
-          <p>{formatarData(licenca.data_inicio)}</p>
+          <p className="text-gray-600">{fila ? "Começa em" : "Inicio"}</p>
+          <p>{licenca.data_inicio ? formatarData(licenca.data_inicio) : "—"}</p>
         </div>
         <div>
-          <p className="text-gray-600">Expira</p>
+          <p className="text-gray-600">Válido até</p>
           <p>{formatarData(licenca.data_expiracao)}</p>
         </div>
         <div>
           <p className="text-gray-600">Restante</p>
-          <p className={dias > 7 ? "text-green-400" : dias > 0 ? "text-yellow-400" : "text-red-400"}>
-            {dias > 0 ? `${dias} dias` : "Expirada"}
-          </p>
+          {fila ? (
+            <p className="text-sky-400">Na fila</p>
+          ) : (
+            <p className={dias > 7 ? "text-green-400" : dias > 0 ? "text-yellow-400" : "text-red-400"}>
+              {dias > 0 ? `${dias} dias` : "Expirado"}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Dispositivo */}
-      <div className="mt-3 pt-3 border-t border-gray-800">
-        {licenca.device_id ? (
-          <div className="space-y-2">
-            <DeviceRow deviceId={licenca.device_id!} chave={licenca.chave} onReset={handleReset} />
-            {pedindoSenha && (
-              <div className="flex items-center gap-2">
-                <input
-                  type="password"
-                  value={senhaReset}
-                  onChange={e => setSenhaReset(e.target.value)}
-                  placeholder="Sua senha pra confirmar"
-                  className="flex-1 px-3 py-1.5 rounded bg-[#0D1117] border border-gray-700 text-white text-xs focus:border-amber-500 focus:outline-none"
-                />
-                <button
-                  onClick={handleReset}
-                  disabled={resetando}
-                  className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold px-3 py-1.5 rounded transition-colors"
-                >
-                  {resetando ? "..." : "Confirmar"}
-                </button>
-                <button
-                  onClick={() => { setPedindoSenha(false); setSenhaReset(""); setResetMsg(""); }}
-                  className="text-gray-500 text-xs hover:text-white"
-                >
-                  Cancelar
-                </button>
-              </div>
-            )}
-            {resetMsg && (
-              <p className={`text-xs ${resetMsg.includes("liberado") ? "text-green-400" : "text-red-400"}`}>{resetMsg}</p>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
-            <span className="text-yellow-400">Nenhum dispositivo cadastrado — ative no app MacroForge</span>
-          </div>
+      {vigente(licenca) && licenca.origem === "play_billing" && (
+        <p className="mt-3 text-xs text-gray-500">
+          {licenca.auto_renews
+            ? "Assinatura da Google Play: renova sozinha. Para cancelar, use Assinaturas na Play Store."
+            : "Assinatura da Google Play: não vai renovar."}
+        </p>
+      )}
+      {vigente(licenca) && licenca.origem === "mercado_pago" && (
+        <p className="mt-3 text-xs text-gray-500">Compra pelo site: 30 dias, sem renovação automática.</p>
+      )}
+
+      {/* Licença ANTIGA (1 aparelho preso à licença): mantém o "Trocar dispositivo" de antes. Os planos novos
+          mostram os aparelhos em "Aparelhos conectados". */}
+      {licenca.device_id && vigente(licenca) && (
+        <div className="mt-3 pt-3 border-t border-gray-800 space-y-2">
+          <DeviceRow deviceId={licenca.device_id} chave={licenca.chave} onReset={handleReset} />
+          {pedindoSenha && (
+            <div className="flex items-center gap-2">
+              <input
+                type="password"
+                value={senhaReset}
+                onChange={e => setSenhaReset(e.target.value)}
+                placeholder="Sua senha pra confirmar"
+                className="flex-1 px-3 py-1.5 rounded bg-[#0D1117] border border-gray-700 text-white text-xs focus:border-amber-500 focus:outline-none"
+              />
+              <button
+                onClick={handleReset}
+                disabled={resetando}
+                className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold px-3 py-1.5 rounded transition-colors"
+              >
+                {resetando ? "..." : "Confirmar"}
+              </button>
+              <button
+                onClick={() => { setPedindoSenha(false); setSenhaReset(""); setResetMsg(""); }}
+                className="text-gray-500 text-xs hover:text-white"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+          {resetMsg && (
+            <p className={`text-xs ${resetMsg.includes("liberado") ? "text-green-400" : "text-red-400"}`}>{resetMsg}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface Aparelho {
+  device_id: string;
+  apelido: string | null;
+  iniciada_em: string | null;
+  renovada_em: string | null;
+  expira_em: string | null;
+}
+
+/**
+ * Aparelhos usando a conta agora (cada um ocupa uma vaga do plano). Mesmos dados do "Meu plano" do app:
+ * GET /api/aparelhos e POST /api/aparelhos/desconectar (libera a vaga na hora; o aparelho derrubado para no
+ * próximo sinal, até 5 min).
+ */
+function AparelhosConectados({ token }: { token: string }) {
+  const [aparelhos, setAparelhos] = useState<Aparelho[] | null>(null);
+  const [limite, setLimite] = useState<number | null>(null);
+  const [erro, setErro] = useState("");
+  const [desconectando, setDesconectando] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    fetch("/api/aparelhos", { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => (res.ok ? res.json() : null))
+      .then((d: { plano?: { ok?: boolean; limite?: number }; aparelhos?: Aparelho[] } | null) => {
+        if (cancelado) return;
+        if (!d || !Array.isArray(d.aparelhos)) {
+          setErro("Nao foi possivel carregar os aparelhos agora.");
+          return;
+        }
+        setAparelhos(d.aparelhos);
+        setLimite(d.plano?.ok && typeof d.plano.limite === "number" ? d.plano.limite : null);
+      })
+      .catch(() => { if (!cancelado) setErro("Nao foi possivel carregar os aparelhos agora."); });
+    return () => { cancelado = true; };
+  }, [token]);
+
+  async function desconectar(deviceId: string) {
+    setDesconectando(deviceId);
+    setErro("");
+    try {
+      const res = await fetch("/api/aparelhos/desconectar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ device_id: deviceId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setAparelhos(lista => (lista ?? []).filter(a => a.device_id !== deviceId));
+      } else {
+        setErro(data.erro || "Nao foi possivel desconectar.");
+      }
+    } catch {
+      setErro("Erro de conexao");
+    }
+    setDesconectando(null);
+  }
+
+  if (aparelhos === null && !erro) return null;
+
+  return (
+    <div className="mb-8">
+      <h2 className="text-lg font-bold mb-1">Aparelhos conectados</h2>
+      <p className="text-gray-500 text-xs mb-4">
+        {limite !== null && aparelhos !== null
+          ? `${aparelhos.length} de ${limite} vagas em uso. `
+          : ""}
+        Trocou de celular? Desconecte o antigo para liberar a vaga.
+      </p>
+      <div className="bg-[#161B22] border border-gray-800 rounded-xl p-5 space-y-3">
+        {aparelhos !== null && aparelhos.length === 0 && (
+          <p className="text-gray-400 text-sm">Nenhum aparelho usando a conta agora.</p>
         )}
+        {(aparelhos ?? []).map(a => (
+          <div key={a.device_id} className="flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
+              {a.apelido ? (
+                <span className="text-white font-medium truncate">{a.apelido}</span>
+              ) : (
+                <span className="font-mono text-white bg-[#0D1117] px-2 py-0.5 rounded truncate">{a.device_id}</span>
+              )}
+            </div>
+            <button
+              onClick={() => desconectar(a.device_id)}
+              disabled={desconectando === a.device_id}
+              className="text-amber-500 hover:underline flex-shrink-0"
+            >
+              {desconectando === a.device_id ? "..." : "Desconectar"}
+            </button>
+          </div>
+        ))}
+        {erro && <p className="text-red-400 text-xs">{erro}</p>}
       </div>
     </div>
   );

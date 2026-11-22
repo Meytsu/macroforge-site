@@ -1,6 +1,17 @@
+import {
+  APARELHOS_DO_NIVEL,
+  DIAS_DO_PLANO,
+  NIVEIS,
+  NOME_NIVEL,
+  PCS_POR_PLANO,
+  formatarPreco,
+  precoNivel,
+} from "@/app/lib/precos";
+
+// ADR-MF-XCROSS-022 (2026-11-22): plano da conta (sem chaves), só mensal, tudo incluído. Preços de lib/precos.ts.
 export const metadata = {
   title: "FAQ — MacroForge",
-  description: "Perguntas frequentes sobre o MacroForge — instalação, permissões, macros, licença.",
+  description: "Perguntas frequentes sobre o MacroForge — instalação, permissões, macros, planos e conta.",
 };
 
 type QA = { q: string; a: React.ReactNode };
@@ -66,7 +77,7 @@ const sections: { titulo: string; items: QA[] }[] = [
         a: (
           <>
             <strong>Não.</strong> A captura de tela é usada apenas para procurar imagens que{" "}
-            <em>você mesmo</em> configurou nos macros (ex: um botão de "atacar" no jogo).
+            <em>você mesmo</em> configurou nos macros (ex: um botão de &quot;atacar&quot; no jogo).
             Nada é gravado, enviado pra servidor nem analisado por nós.
           </>
         ),
@@ -144,37 +155,161 @@ const sections: { titulo: string; items: QA[] }[] = [
     ],
   },
   {
-    titulo: "Pagamento e licença",
+    titulo: "Planos e pagamento",
     items: [
       {
         q: "Quanto custa?",
         a: (
           <>
-            O app tem um período de teste gratuito ao instalar. Após isso, a licença é
-            paga e renovada manualmente — ver{" "}
-            <a href="/planos" className="text-[#D4A017] hover:underline">
-              planos
-            </a>
-            .
+            Os planos são <strong>mensais</strong> e todos incluem tudo — o que muda é quantos aparelhos usam o
+            app ao mesmo tempo:
+            <ul className="list-disc pl-6 mt-2 space-y-1">
+              {NIVEIS.map((n) => (
+                <li key={n}>
+                  <strong>{NOME_NIVEL[n]}</strong> — {APARELHOS_DO_NIVEL[n]} aparelhos + {PCS_POR_PLANO} PC — R${" "}
+                  {formatarPreco(precoNivel(n))}/mês
+                </li>
+              ))}
+            </ul>
+            <span className="block mt-2">
+              Veja os detalhes em{" "}
+              <a href="/planos" className="text-[#D4A017] hover:underline">
+                planos
+              </a>
+              .
+            </span>
           </>
         ),
       },
       {
-        q: "A licença renova sozinha?",
+        q: "O que vem incluído no plano?",
         a: (
           <>
-            <strong>Não</strong> — sem cobrança automática. Quando expira, você decide se
-            renova.
+            <strong>Tudo, em qualquer plano:</strong> todas as DGs dos Macros Forjados e a TG, no app e no MacroForge
+            PC; a Coleção e a Loja de DP no MacroForge PC (no app, em breve). O plano só muda a quantidade de aparelhos.
           </>
         ),
       },
       {
-        q: "Posso usar minha chave em mais de um celular?",
+        q: "Tem teste grátis?",
         a: (
           <>
-            Cada chave funciona em <strong>1 dispositivo por vez</strong>. Pra trocar de
-            aparelho, vá em <strong>Chaves e Ativação</strong> no menu e desative no
-            anterior antes de ativar no novo.
+            Sim. São <strong>3 dias grátis com tudo liberado</strong> (1 celular + 1 PC). Basta criar sua conta e
+            ativar o teste no app.
+          </>
+        ),
+      },
+      {
+        q: "Como eu compro?",
+        a: (
+          <>
+            De dois jeitos, sempre com a mesma conta:
+            <ul className="list-disc pl-6 mt-2 space-y-1">
+              <li>
+                <strong>No app</strong>, pela Google Play (assinatura mensal).
+              </li>
+              <li>
+                <strong>No site</strong>, em{" "}
+                <a href="/planos" className="text-[#D4A017] hover:underline">
+                  planos
+                </a>
+                , pelo Mercado Pago — <strong>PIX ou cartão</strong>. Cada compra vale {DIAS_DO_PLANO} dias.
+              </li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        q: "E se eu comprar de novo ou quiser trocar de plano?",
+        a: (
+          <>
+            Comprando o <strong>mesmo plano</strong>, os {DIAS_DO_PLANO} dias são somados ao que você já tem.
+            Comprando um <strong>plano diferente</strong>, ele entra na <strong>fila</strong> e começa sozinho
+            quando o atual acabar — no{" "}
+            <a href="/painel" className="text-[#D4A017] hover:underline">
+              painel
+            </a>{" "}
+            ele aparece como &quot;Na fila&quot;, com a data em que começa.
+          </>
+        ),
+      },
+      {
+        q: "O plano renova sozinho? Como cancelo?",
+        a: (
+          <>
+            Depende de onde você comprou:
+            <ul className="list-disc pl-6 mt-2 space-y-1">
+              <li>
+                <strong>Google Play (no app):</strong> é uma assinatura e renova todo mês. Para cancelar, abra a
+                Play Store → <strong>Pagamentos e assinaturas</strong> → <strong>Assinaturas</strong>. O plano
+                continua valendo até o fim do mês já pago.
+              </li>
+              <li>
+                <strong>Site (Mercado Pago):</strong> <strong>não renova sozinho</strong> — é uma compra única de{" "}
+                {DIAS_DO_PLANO} dias. Não há nada para cancelar: se não comprar de novo, o plano simplesmente acaba.
+              </li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        q: "Comprei DGs avulsas antes. Perco elas?",
+        a: (
+          <>
+            <strong>Não.</strong> As DGs compradas avulsas continuam suas para sempre, com ou sem plano.
+          </>
+        ),
+      },
+    ],
+  },
+  {
+    titulo: "Conta e aparelhos",
+    items: [
+      {
+        q: "Preciso digitar alguma chave para ativar?",
+        a: (
+          <>
+            <strong>Não.</strong> O plano fica na sua conta: é só entrar no app e no MacroForge PC com o mesmo
+            e-mail e senha do site.
+          </>
+        ),
+      },
+      {
+        q: "Posso usar em mais de um celular?",
+        a: (
+          <>
+            Sim. Cada plano libera um número de aparelhos usando o app <strong>ao mesmo tempo</strong> (Pro{" "}
+            {APARELHOS_DO_NIVEL.pro}, Mega {APARELHOS_DO_NIVEL.mega}, Ultra {APARELHOS_DO_NIVEL.ultra}), todos
+            entrando com a mesma conta. Além deles, todo plano inclui {PCS_POR_PLANO} PC.
+          </>
+        ),
+      },
+      {
+        q: "Troquei de celular. Como libero o antigo?",
+        a: (
+          <>
+            Desconecte o aparelho antigo em <strong>Meu plano</strong>, no app de outro aparelho da conta, ou em{" "}
+            <strong>Aparelhos conectados</strong>, no{" "}
+            <a href="/painel" className="text-[#D4A017] hover:underline">
+              painel
+            </a>{" "}
+            do site. A vaga é liberada na hora. Se o aparelho antigo simplesmente parar de usar o app, a vaga
+            também se libera sozinha depois de alguns minutos.
+          </>
+        ),
+      },
+      {
+        q: "O que é o MacroForge PC?",
+        a: (
+          <>
+            É o programa para <strong>Windows</strong> que roda os macros em emuladores Android no computador.
+            Requer Windows 10 ou 11 (64 bits) com o MSI App Player, o BlueStacks 5 ou o LDPlayer 9 (com o ADB
+            ligado). Todo plano inclui <strong>{PCS_POR_PLANO} PC por vez</strong>, com quantos emuladores você
+            quiser nele. Baixe o instalador no{" "}
+            <a href="/painel" className="text-[#D4A017] hover:underline">
+              painel
+            </a>{" "}
+            e entre com a mesma conta.
           </>
         ),
       },
@@ -191,7 +326,7 @@ const sections: { titulo: string; items: QA[] }[] = [
             <ul className="list-disc pl-6 mt-2 space-y-1">
               <li>A permissão de <strong>Acessibilidade</strong> está ligada nos Ajustes do Android?</li>
               <li>O macro foi criado na mesma orientação da tela (retrato/paisagem)?</li>
-              <li>A resolução do celular bate com a do macro original? (visto na ficha do macro em "Meus Macros")</li>
+              <li>A resolução do celular bate com a do macro original? (visto na ficha do macro em &quot;Meus Macros&quot;)</li>
             </ul>
           </>
         ),
