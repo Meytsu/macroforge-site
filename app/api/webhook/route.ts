@@ -135,6 +135,17 @@ export async function POST(req: NextRequest) {
     // 1) A verdade vem do Mercado Pago, não do corpo. Se o MP falhar, lança → 500 → ele reenvia.
     const pag = await new Payment(new MercadoPagoConfig({ accessToken })).get({ id: paymentId });
 
+    // Reembolso / contestação (2026-11-22, sql/16): desfaz o que este pagamento concedeu. Erro de banco → 500 (o MP reenvia).
+    if (pag.status === "refunded" || pag.status === "charged_back") {
+      const e = await rpc("mf_mp_estornar", { p_payment_id: String(paymentId), p_status: pag.status }).catch((err) => {
+        console.error("webhook: erro no estorno", paymentId, err);
+        return null;
+      });
+      if (!e?.ok) return NextResponse.json({ error: "Falha ao estornar" }, { status: 500 });
+      console.log(`webhook: estorno ${paymentId} (${pag.status}):`, e.feito ?? e.codigo);
+      return NextResponse.json({ ok: true, estorno: pag.status });
+    }
+
     if (pag.status !== "approved") {
       console.log(`webhook: pagamento ${paymentId} com status ${pag.status}`);
       return NextResponse.json({ ok: true, status: pag.status });
