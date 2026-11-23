@@ -253,10 +253,11 @@ const sections: { titulo: string; items: QA[] }[] = [
         ),
       },
       {
-        q: "Comprei DGs avulsas antes. Perco elas?",
+        q: "Posso usar os Macros Forjados sem plano?",
         a: (
           <>
-            <strong>Não.</strong> As DGs compradas avulsas continuam suas para sempre, com ou sem plano.
+            <strong>Não.</strong> Os Macros Forjados funcionam só com um plano ativo (ou o teste grátis de 3 dias).
+            Com o plano, todas as DGs ficam liberadas para baixar e usar.
           </>
         ),
       },
