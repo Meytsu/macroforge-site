@@ -6,7 +6,7 @@
  * COMO ATUALIZAR A CADA VERSÃO: compilar (pc/instalador/compilar.ps1 no repo privado), criar a release
  * `pc-v<versão>` aqui com o arquivo `MacroForge-PC-Setup-<versão>.exe` e trocar PC_VERSAO abaixo.
  */
-export const PC_VERSAO = "0.1.7";
+export const PC_VERSAO = "0.1.8";
 
 export const URL_INSTALADOR_PC =
   `https://github.com/Meytsu/macroforge-site/releases/download/pc-v${PC_VERSAO}/MacroForge-PC-Setup-${PC_VERSAO}.exe`;
@@ -21,10 +21,7 @@ export const URL_INSTALADOR_PC =
  * ⚠️ O CHANGELOG É LIDO PELO CLIENTE na janela da atualização. Não anunciar o que não funciona.
  */
 export const PC_CHANGELOG: string[] = [
-  "O programa agora se atualiza sozinho ao abrir: baixa só o que mudou e pede uma confirmação do Windows.",
-  "Suporte ao MuMu Player (a resolução da instância precisa ser 1280×720).",
-  "LDPlayer: acha a porta do ADB também nas versões antigas e grava um registro (logs\\ldplayer.log) para diagnóstico.",
-  "Monitores: CPU, GPU, FPS e RAM numa linha só.",
+  "Correção: as DGs novas (Jardim Decadente, Pandemônio, Arena Lendária, Enfraquecidas e outras) não rodavam no programa instalado.",
 ];
 
 export const PC_URL_ARQUIVOS = "https://github.com/Meytsu/macroforge-site/releases/download";

@@ -1,6 +1,6 @@
 {
-  "versao": "0.1.7",
-  "gerado_em": "2026-11-24T03:11:47Z",
+  "versao": "0.1.8",
+  "gerado_em": "2026-11-24T03:36:55Z",
   "arquivos": {
     "_bz2.pyd": {"sha256": "65f610646d10d5babea080e060d244b546ec52c54012e5e937dc72dcc2e2e7bc", "tamanho": 86896},
     "_cffi_backend.pyd": {"sha256": "9af5e4f68a41f26b726f2e9424f9d58a4f5666189f6a48be95f406b257102aec", "tamanho": 181248},
@@ -91,7 +91,7 @@
     "licencas/Python-PSF-LICENSE.txt": {"sha256": "e502c6b880ff58d614901495a9009c136539cd0b1e2a2abb8fc00b934c203419", "tamanho": 36874},
     "licencas/scrcpy-Apache-2.0.txt": {"sha256": "01c12035bf35af37241298dc7ad538eb2a07e5c940437bc6876feeaa9d1951d0", "tamanho": 11387},
     "licencas/tesseract-LICENSE.txt": {"sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30", "tamanho": 11358},
-    "MacroForge.exe": {"sha256": "d050abdbb0bcdd3c75fb77ea49d2754ba985fe7e1b51332f245dcc5f5b17585a", "tamanho": 35055104},
+    "MacroForge.exe": {"origem": "0.1.8", "sha256": "afa673fa1488b8d612ee7b94639ff31263562a38be9052389a8932e494c83443", "tamanho": 35056640},
     "MacroForge.ico": {"sha256": "8b33ba87ba882c8a9118c341ef5b1d1af0750d93699796d7f080bb40f496c769", "tamanho": 92432},
     "macroforge_pc/recursos/mf-tela.jar": {"sha256": "5e687ad488acaf0c6b4247ee263ad2f1dcd42748597b065f8a87bfdd0bfb0fcb", "tamanho": 3328},
     "msvcp140.dll": {"sha256": "f6f1d55bfd64027820ddce48f9cd8cf46d53bfa34047e6acf4ef348d492a05cb", "tamanho": 549176},
@@ -1126,6 +1126,6 @@
     "unicodedata.pyd": {"sha256": "208ee1cd3cbad0828433ca7246b05be2b1ff5569983d27d296c0b38888585488", "tamanho": 1140592},
     "vcruntime140.dll": {"sha256": "052ad6a20d375957e82aa6a3c441ea548d89be0981516ca7eb306e063d5027f4", "tamanho": 120400},
     "vcruntime140_1.dll": {"sha256": "6a99bc0128e0c7d6cbbf615fcc26909565e17d4ca3451b97f8987f9c6acbc6c8", "tamanho": 49776},
-    "versao.txt": {"sha256": "1a6cadcf0974aecbea5798ec1187535c749b5ab39bdaf0118ef800dcdf531b06", "tamanho": 5}
+    "versao.txt": {"origem": "0.1.8", "sha256": "40ae30b1feef0bfa31691469cc10b4519af33c4f03cdd0446cfcb2c4c815df1a", "tamanho": 5}
   }
 }
