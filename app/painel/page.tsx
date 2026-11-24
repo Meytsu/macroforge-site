@@ -281,7 +281,7 @@ export default function PainelPage() {
           <div className="flex-1">
             <h3 className="font-bold mb-1">MacroForge PC (Windows)</h3>
             <p className="text-gray-400 text-sm">
-              Windows 10 ou 11 (64 bits) com o MSI App Player, o BlueStacks 5 ou o LDPlayer 9 (com o ADB ligado). Entre no programa com esta mesma conta.
+              Windows 10 ou 11 (64 bits) com o MSI App Player, o BlueStacks 5, o LDPlayer 9 ou o MuMu Player (com o ADB ligado). Entre no programa com esta mesma conta.
             </p>
           </div>
           <a

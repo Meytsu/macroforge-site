@@ -141,7 +141,7 @@ export default function Home() {
               Baixar para Windows
             </a>
             <p className="text-gray-500 text-xs mt-3">
-              Versão {PC_VERSAO} · Windows 10 ou 11 (64 bits) · emulador MSI App Player, BlueStacks 5 ou LDPlayer 9 · internet
+              Versão {PC_VERSAO} · Windows 10 ou 11 (64 bits) · emulador MSI App Player, BlueStacks 5, LDPlayer 9 ou MuMu Player · internet
             </p>
           </div>
         </div>

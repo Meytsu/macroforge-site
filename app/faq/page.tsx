@@ -304,7 +304,7 @@ const sections: { titulo: string; items: QA[] }[] = [
         a: (
           <>
             É o programa para <strong>Windows</strong> que roda os macros em emuladores Android no computador.
-            Requer Windows 10 ou 11 (64 bits) com o MSI App Player, o BlueStacks 5 ou o LDPlayer 9 (com o ADB
+            Requer Windows 10 ou 11 (64 bits) com o MSI App Player, o BlueStacks 5, o LDPlayer 9 ou o MuMu Player (com o ADB
             ligado). Todo plano inclui <strong>{PCS_POR_PLANO} PC por vez</strong>, com quantos emuladores você
             quiser nele. Baixe o instalador no{" "}
             <a href="/painel" className="text-[#D4A017] hover:underline">

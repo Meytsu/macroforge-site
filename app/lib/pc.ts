@@ -6,7 +6,25 @@
  * COMO ATUALIZAR A CADA VERSÃO: compilar (pc/instalador/compilar.ps1 no repo privado), criar a release
  * `pc-v<versão>` aqui com o arquivo `MacroForge-PC-Setup-<versão>.exe` e trocar PC_VERSAO abaixo.
  */
-export const PC_VERSAO = "0.1.6";
+export const PC_VERSAO = "0.1.7";
 
 export const URL_INSTALADOR_PC =
   `https://github.com/Meytsu/macroforge-site/releases/download/pc-v${PC_VERSAO}/MacroForge-PC-Setup-${PC_VERSAO}.exe`;
+
+/**
+ * Atualização automática do programa (2026-11-23; rota /api/pc/versao). O programa compilado consulta a rota ao abrir
+ * e, se PC_VERSAO for mais nova que a dele, baixa SÓ os arquivos que mudaram, um asset por conteúdo:
+ * `${PC_URL_ARQUIVOS}/pc-v<origem>/<sha256>` (a lista vem de pc-manifesto.json, gerado no repo privado por
+ * pc/ferramentas/gerar_manifesto_pc.py). A CADA VERSÃO: trocar PC_VERSAO, escrever PC_CHANGELOG e substituir o
+ * pc-manifesto.json pelo gerado — a rota só responde se a versão do manifesto for igual a PC_VERSAO.
+ *
+ * ⚠️ O CHANGELOG É LIDO PELO CLIENTE na janela da atualização. Não anunciar o que não funciona.
+ */
+export const PC_CHANGELOG: string[] = [
+  "O programa agora se atualiza sozinho ao abrir: baixa só o que mudou e pede uma confirmação do Windows.",
+  "Suporte ao MuMu Player (a resolução da instância precisa ser 1280×720).",
+  "LDPlayer: acha a porta do ADB também nas versões antigas e grava um registro (logs\\ldplayer.log) para diagnóstico.",
+  "Monitores: CPU, GPU, FPS e RAM numa linha só.",
+];
+
+export const PC_URL_ARQUIVOS = "https://github.com/Meytsu/macroforge-site/releases/download";
