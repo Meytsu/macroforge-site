@@ -6,7 +6,7 @@
  * COMO ATUALIZAR A CADA VERSÃO: compilar (pc/instalador/compilar.ps1 no repo privado), criar a release
  * `pc-v<versão>` aqui com o arquivo `MacroForge-PC-Setup-<versão>.exe` e trocar PC_VERSAO abaixo.
  */
-export const PC_VERSAO = "0.1.8";
+export const PC_VERSAO = "0.1.9";
 
 export const URL_INSTALADOR_PC =
   `https://github.com/Meytsu/macroforge-site/releases/download/pc-v${PC_VERSAO}/MacroForge-PC-Setup-${PC_VERSAO}.exe`;
@@ -21,7 +21,8 @@ export const URL_INSTALADOR_PC =
  * ⚠️ O CHANGELOG É LIDO PELO CLIENTE na janela da atualização. Não anunciar o que não funciona.
  */
 export const PC_CHANGELOG: string[] = [
-  "Correção: as DGs novas (Jardim Decadente, Pandemônio, Arena Lendária, Enfraquecidas e outras) não rodavam no programa instalado.",
+  "Correção: o Cacto Contaminado não achava o item na loja.",
+  "Os nomes das DGs novas no catálogo sem a marca \"(em teste)\".",
 ];
 
 export const PC_URL_ARQUIVOS = "https://github.com/Meytsu/macroforge-site/releases/download";

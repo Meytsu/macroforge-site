@@ -1,6 +1,6 @@
 {
-  "versao": "0.1.8",
-  "gerado_em": "2026-11-24T03:36:55Z",
+  "versao": "0.1.9",
+  "gerado_em": "2026-11-24T10:15:05Z",
   "arquivos": {
     "_bz2.pyd": {"sha256": "65f610646d10d5babea080e060d244b546ec52c54012e5e937dc72dcc2e2e7bc", "tamanho": 86896},
     "_cffi_backend.pyd": {"sha256": "9af5e4f68a41f26b726f2e9424f9d58a4f5666189f6a48be95f406b257102aec", "tamanho": 181248},
@@ -17,7 +17,7 @@
     "_uuid.pyd": {"sha256": "acce4f281d7ffb2dec0997527faf25b1df62ad7bd3032c568ddcf65c90edc867", "tamanho": 27128},
     "_wmi.pyd": {"sha256": "a980f1e7a29842bd946863fc2693fbeb555a9dc0f9e1630dfed9a2fcdef3ece2", "tamanho": 40304},
     "assets/MacroForge_icon_clean.png": {"sha256": "6368932dd9ba87325c35b22d17638ec9930e1e800b7d0be4b0078fb73e54e963", "tamanho": 2332784},
-    "atualizar.ps1": {"sha256": "abd664da957f0e0f3e67122c0b6d65477e687c42c1cfe4f302bc554c591d9468", "tamanho": 8250},
+    "atualizar.ps1": {"origem": "0.1.9", "sha256": "7515cf0ed9d1e236428768d6af99fb2751925c812822e84f885ce369a799b612", "tamanho": 8590},
     "AVISOS-TERCEIROS.txt": {"sha256": "71f415b21d8cd80dbaaccdfc634de4a356a1e49367ae6381ae1f8163134a8bb0", "tamanho": 7620},
     "cryptography/hazmat/bindings/_rust.pyd": {"sha256": "1d4332a447cab13dec8e3a533ad579e0e562b79e40822c931f33769758fc7156", "tamanho": 9897472},
     "cv2/cv2.pyd": {"sha256": "eefedf6ee006a84bbc7d3df5ec66046429b8c95dbfd5f8f8f98c5772b91d6d48", "tamanho": 85848064},
@@ -91,7 +91,7 @@
     "licencas/Python-PSF-LICENSE.txt": {"sha256": "e502c6b880ff58d614901495a9009c136539cd0b1e2a2abb8fc00b934c203419", "tamanho": 36874},
     "licencas/scrcpy-Apache-2.0.txt": {"sha256": "01c12035bf35af37241298dc7ad538eb2a07e5c940437bc6876feeaa9d1951d0", "tamanho": 11387},
     "licencas/tesseract-LICENSE.txt": {"sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30", "tamanho": 11358},
-    "MacroForge.exe": {"origem": "0.1.8", "sha256": "afa673fa1488b8d612ee7b94639ff31263562a38be9052389a8932e494c83443", "tamanho": 35056640},
+    "MacroForge.exe": {"origem": "0.1.9", "sha256": "079dc5610cc042c06dd9b13f4057491b1bc9a1d502ace067e715e7814ac13114", "tamanho": 35059200},
     "MacroForge.ico": {"sha256": "8b33ba87ba882c8a9118c341ef5b1d1af0750d93699796d7f080bb40f496c769", "tamanho": 92432},
     "macroforge_pc/recursos/mf-tela.jar": {"sha256": "5e687ad488acaf0c6b4247ee263ad2f1dcd42748597b065f8a87bfdd0bfb0fcb", "tamanho": 3328},
     "msvcp140.dll": {"sha256": "f6f1d55bfd64027820ddce48f9cd8cf46d53bfa34047e6acf4ef348d492a05cb", "tamanho": 549176},
@@ -1126,6 +1126,6 @@
     "unicodedata.pyd": {"sha256": "208ee1cd3cbad0828433ca7246b05be2b1ff5569983d27d296c0b38888585488", "tamanho": 1140592},
     "vcruntime140.dll": {"sha256": "052ad6a20d375957e82aa6a3c441ea548d89be0981516ca7eb306e063d5027f4", "tamanho": 120400},
     "vcruntime140_1.dll": {"sha256": "6a99bc0128e0c7d6cbbf615fcc26909565e17d4ca3451b97f8987f9c6acbc6c8", "tamanho": 49776},
-    "versao.txt": {"origem": "0.1.8", "sha256": "40ae30b1feef0bfa31691469cc10b4519af33c4f03cdd0446cfcb2c4c815df1a", "tamanho": 5}
+    "versao.txt": {"origem": "0.1.9", "sha256": "51236fb3aface1b9e89f5494ec73f719902988a6a86c8f2bdcbd318757aa8200", "tamanho": 5}
   }
 }
