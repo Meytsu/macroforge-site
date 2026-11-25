@@ -1,24 +1,14 @@
-import Link from "next/link";
+import { Suspense } from "react";
+import Acompanhar from "./Acompanhar";
 
+// Pix e outros pagamentos que voltam do Mercado Pago antes de aprovados: a página confere sozinha e mostra a confirmação
+// quando o banco aprovar (2026-11-24 — antes ela só dizia "pendente").
 export default function Pendente() {
   return (
     <main className="min-h-screen bg-[#0D1117] text-white flex items-center justify-center px-6">
-      <div className="text-center max-w-md">
-        <div className="text-6xl mb-6">&#9203;</div>
-        <h1 className="text-3xl font-bold mb-4 text-amber-400">
-          Pagamento pendente
-        </h1>
-        <p className="text-gray-400 mb-8">
-          Estamos aguardando a confirmacao do pagamento. Assim que confirmado,
-          seu plano e liberado na sua conta e voce recebe um e-mail.
-        </p>
-        <Link
-          href="/"
-          className="bg-amber-500 hover:bg-amber-600 text-black font-bold px-8 py-3 rounded-xl transition-colors"
-        >
-          Voltar ao inicio
-        </Link>
-      </div>
+      <Suspense fallback={null}>
+        <Acompanhar />
+      </Suspense>
     </main>
   );
 }
