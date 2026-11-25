@@ -1,6 +1,6 @@
 {
-  "versao": "0.1.9",
-  "gerado_em": "2026-11-24T10:15:05Z",
+  "versao": "0.1.10",
+  "gerado_em": "2026-11-25T02:40:53Z",
   "arquivos": {
     "_bz2.pyd": {"sha256": "65f610646d10d5babea080e060d244b546ec52c54012e5e937dc72dcc2e2e7bc", "tamanho": 86896},
     "_cffi_backend.pyd": {"sha256": "9af5e4f68a41f26b726f2e9424f9d58a4f5666189f6a48be95f406b257102aec", "tamanho": 181248},
@@ -16,9 +16,18 @@
     "_ssl.pyd": {"sha256": "0bc527d2dbc50009f43b2ed5d5982c4f63f4b647647ffa9eda612dcda80f6040", "tamanho": 179432},
     "_uuid.pyd": {"sha256": "acce4f281d7ffb2dec0997527faf25b1df62ad7bd3032c568ddcf65c90edc867", "tamanho": 27128},
     "_wmi.pyd": {"sha256": "a980f1e7a29842bd946863fc2693fbeb555a9dc0f9e1630dfed9a2fcdef3ece2", "tamanho": 40304},
+    "assets/fontes/jetbrains_mono_bold.ttf": {"origem": "0.1.10", "sha256": "d22c4f3821d725eb01210d278d95dfcfcaadc34699a06658d47c8a5cc5830ada", "tamanho": 274096},
+    "assets/fontes/jetbrains_mono_regular.ttf": {"origem": "0.1.10", "sha256": "e6fd0d7e91550b3ed2b735d4312474362c4716edc4fc0577a0f61ed782d5aed1", "tamanho": 270224},
+    "assets/fontes/outfit_bold.ttf": {"origem": "0.1.10", "sha256": "f620b69582e06d7e1b3bbde74ed8c5876eadabb038390780db2a3414a1490197", "tamanho": 75992},
+    "assets/fontes/outfit_medium.ttf": {"origem": "0.1.10", "sha256": "dc8d9212fc57556a55d01e863071f727cd6264b748e28885d853807aeb186142", "tamanho": 74996},
+    "assets/fontes/outfit_regular.ttf": {"origem": "0.1.10", "sha256": "3b64ac4f6ab6a8eebddd4b0bc03c811c43602e11e176382ab0ee6be615ab861b", "tamanho": 75132},
+    "assets/fontes/outfit_semibold.ttf": {"origem": "0.1.10", "sha256": "bf2e1d2a6ec2a67952e8b36edd2b2bb9f340c0cdd10b0ad5145b4dbbc1339608", "tamanho": 76116},
+    "assets/MacroForge_escudo.png": {"origem": "0.1.10", "sha256": "696bad3dfd54535e29162f9a54939bcce8e1aa55ce33779c031c8a2528ebef8f", "tamanho": 552822},
     "assets/MacroForge_icon_clean.png": {"sha256": "6368932dd9ba87325c35b22d17638ec9930e1e800b7d0be4b0078fb73e54e963", "tamanho": 2332784},
-    "atualizar.ps1": {"origem": "0.1.9", "sha256": "7515cf0ed9d1e236428768d6af99fb2751925c812822e84f885ce369a799b612", "tamanho": 8590},
-    "AVISOS-TERCEIROS.txt": {"sha256": "71f415b21d8cd80dbaaccdfc634de4a356a1e49367ae6381ae1f8163134a8bb0", "tamanho": 7620},
+    "assets/MacroForge_marca_claro.png": {"origem": "0.1.10", "sha256": "3ed8eae2a2047f9d152dcc45c9d6443000032be131dcca43ea22a9784f42cfc5", "tamanho": 587547},
+    "assets/MacroForge_marca_escuro.png": {"origem": "0.1.10", "sha256": "055328d71480791b6c74a2fc15ff020b3d884a0f84ac9c1aa84818df4923233d", "tamanho": 358768},
+    "atualizar.ps1": {"origem": "0.1.10", "sha256": "1906351156c5ef3ee1a40c605031ea2ef417e69b0649bfd0d97e94eeca7e524c", "tamanho": 9132},
+    "AVISOS-TERCEIROS.txt": {"origem": "0.1.10", "sha256": "11a132f74644428e7bdc24aab3382969e01533a80b521c3e88cbeb1d767a03a5", "tamanho": 7955},
     "cryptography/hazmat/bindings/_rust.pyd": {"sha256": "1d4332a447cab13dec8e3a533ad579e0e562b79e40822c931f33769758fc7156", "tamanho": 9897472},
     "cv2/cv2.pyd": {"sha256": "eefedf6ee006a84bbc7d3df5ec66046429b8c95dbfd5f8f8f98c5772b91d6d48", "tamanho": 85848064},
     "cv2/opencv_videoio_ffmpeg500_64.dll": {"sha256": "7aabff029d1fa47cf56ede4dbbe05dc62da3208f07cd16471d4c966a33f9aa31", "tamanho": 30876160},
@@ -84,6 +93,7 @@
     "licencas/LGPL-2.1.txt": {"sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95", "tamanho": 26419},
     "licencas/LGPL-3.0.txt": {"sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118", "tamanho": 7652},
     "licencas/numpy-LICENSE.txt": {"sha256": "a804dff0ead9fadc5293456410bcbfc32bf024be9c4513459663fb7b442d2341", "tamanho": 45831},
+    "licencas/OFL-1.1.txt": {"origem": "0.1.10", "sha256": "63e4fece1cd999543ae2ea564fa0d9af3f4ab3952e66f91a761e9feb24757b3a", "tamanho": 4484},
     "licencas/opencv-LICENSE-3RD-PARTY.txt": {"sha256": "c1d60169b55cee56452b227c2fd2a7b9ddda3dd3741065f1c6201072be73fadb", "tamanho": 183251},
     "licencas/opencv-LICENSE.txt": {"sha256": "edef0fac1eb08d29d34563f724742e078da2513e196133a12c6ad9ff01e26107", "tamanho": 1090},
     "licencas/platform-tools-adb-NOTICE.txt": {"sha256": "628f43e9c88e2bf5aee9fc4c1cb672bf3931ba12dd5ef75c8170678395f3ca23", "tamanho": 1154858},
@@ -91,7 +101,7 @@
     "licencas/Python-PSF-LICENSE.txt": {"sha256": "e502c6b880ff58d614901495a9009c136539cd0b1e2a2abb8fc00b934c203419", "tamanho": 36874},
     "licencas/scrcpy-Apache-2.0.txt": {"sha256": "01c12035bf35af37241298dc7ad538eb2a07e5c940437bc6876feeaa9d1951d0", "tamanho": 11387},
     "licencas/tesseract-LICENSE.txt": {"sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30", "tamanho": 11358},
-    "MacroForge.exe": {"origem": "0.1.9", "sha256": "079dc5610cc042c06dd9b13f4057491b1bc9a1d502ace067e715e7814ac13114", "tamanho": 35059200},
+    "MacroForge.exe": {"origem": "0.1.10", "sha256": "e71ff18feef7a38a824c9f51751ab4c18aad5872ac1e0c86fcd84317d5a85800", "tamanho": 35670016},
     "MacroForge.ico": {"sha256": "8b33ba87ba882c8a9118c341ef5b1d1af0750d93699796d7f080bb40f496c769", "tamanho": 92432},
     "macroforge_pc/recursos/mf-tela.jar": {"sha256": "5e687ad488acaf0c6b4247ee263ad2f1dcd42748597b065f8a87bfdd0bfb0fcb", "tamanho": 3328},
     "msvcp140.dll": {"sha256": "f6f1d55bfd64027820ddce48f9cd8cf46d53bfa34047e6acf4ef348d492a05cb", "tamanho": 549176},
@@ -1126,6 +1136,6 @@
     "unicodedata.pyd": {"sha256": "208ee1cd3cbad0828433ca7246b05be2b1ff5569983d27d296c0b38888585488", "tamanho": 1140592},
     "vcruntime140.dll": {"sha256": "052ad6a20d375957e82aa6a3c441ea548d89be0981516ca7eb306e063d5027f4", "tamanho": 120400},
     "vcruntime140_1.dll": {"sha256": "6a99bc0128e0c7d6cbbf615fcc26909565e17d4ca3451b97f8987f9c6acbc6c8", "tamanho": 49776},
-    "versao.txt": {"origem": "0.1.9", "sha256": "51236fb3aface1b9e89f5494ec73f719902988a6a86c8f2bdcbd318757aa8200", "tamanho": 5}
+    "versao.txt": {"origem": "0.1.10", "sha256": "8a448394dabf3721284d94fa1e70d8e44cae3c6ea6ea83574c342b3a82131f07", "tamanho": 6}
   }
 }

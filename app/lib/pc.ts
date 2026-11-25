@@ -6,7 +6,7 @@
  * COMO ATUALIZAR A CADA VERSÃO: compilar (pc/instalador/compilar.ps1 no repo privado), criar a release
  * `pc-v<versão>` aqui com o arquivo `MacroForge-PC-Setup-<versão>.exe` e trocar PC_VERSAO abaixo.
  */
-export const PC_VERSAO = "0.1.9";
+export const PC_VERSAO = "0.1.10";
 
 export const URL_INSTALADOR_PC =
   `https://github.com/Meytsu/macroforge-site/releases/download/pc-v${PC_VERSAO}/MacroForge-PC-Setup-${PC_VERSAO}.exe`;
@@ -21,8 +21,13 @@ export const URL_INSTALADOR_PC =
  * ⚠️ O CHANGELOG É LIDO PELO CLIENTE na janela da atualização. Não anunciar o que não funciona.
  */
 export const PC_CHANGELOG: string[] = [
-  "Correção: o Cacto Contaminado não achava o item na loja.",
-  "Os nomes das DGs novas no catálogo sem a marca \"(em teste)\".",
+  "Nova aba Início: a sua conta, o tempo que falta do plano, os planos para assinar ou renovar e as novidades de cada versão. Pagou? O programa avisa assim que o plano entra.",
+  "Tema claro e escuro, com as cores do app (Configurações → Aparência).",
+  "Tela de login nova, com \"Esqueceu a senha?\" e \"Criar conta\".",
+  "A tela dos Androids ficou nítida nos Monitores, na tela ampliada e na tela cheia.",
+  "Depois de atualizar, o programa abre de novo sozinho.",
+  "Coleção/Alquimia, Loja de DP e Configurações mais organizadas.",
+  "Os Tokens de Prata e de Ouro são reconhecidos com mais precisão.",
 ];
 
 export const PC_URL_ARQUIVOS = "https://github.com/Meytsu/macroforge-site/releases/download";
