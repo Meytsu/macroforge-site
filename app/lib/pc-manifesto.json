@@ -1,6 +1,6 @@
 {
-  "versao": "0.1.10",
-  "gerado_em": "2026-11-25T02:40:53Z",
+  "versao": "0.1.11",
+  "gerado_em": "2026-11-26T19:15:44Z",
   "arquivos": {
     "_bz2.pyd": {"sha256": "65f610646d10d5babea080e060d244b546ec52c54012e5e937dc72dcc2e2e7bc", "tamanho": 86896},
     "_cffi_backend.pyd": {"sha256": "9af5e4f68a41f26b726f2e9424f9d58a4f5666189f6a48be95f406b257102aec", "tamanho": 181248},
@@ -101,7 +101,7 @@
     "licencas/Python-PSF-LICENSE.txt": {"sha256": "e502c6b880ff58d614901495a9009c136539cd0b1e2a2abb8fc00b934c203419", "tamanho": 36874},
     "licencas/scrcpy-Apache-2.0.txt": {"sha256": "01c12035bf35af37241298dc7ad538eb2a07e5c940437bc6876feeaa9d1951d0", "tamanho": 11387},
     "licencas/tesseract-LICENSE.txt": {"sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30", "tamanho": 11358},
-    "MacroForge.exe": {"origem": "0.1.10", "sha256": "e71ff18feef7a38a824c9f51751ab4c18aad5872ac1e0c86fcd84317d5a85800", "tamanho": 35670016},
+    "MacroForge.exe": {"origem": "0.1.11", "sha256": "21e322595feb64f90cf4ba5087f4fe764c469d94b075ce0fa99fc65e4a38ace4", "tamanho": 35738112},
     "MacroForge.ico": {"sha256": "8b33ba87ba882c8a9118c341ef5b1d1af0750d93699796d7f080bb40f496c769", "tamanho": 92432},
     "macroforge_pc/recursos/mf-tela.jar": {"sha256": "5e687ad488acaf0c6b4247ee263ad2f1dcd42748597b065f8a87bfdd0bfb0fcb", "tamanho": 3328},
     "msvcp140.dll": {"sha256": "f6f1d55bfd64027820ddce48f9cd8cf46d53bfa34047e6acf4ef348d492a05cb", "tamanho": 549176},
@@ -1091,6 +1091,7 @@
     "padroes/loja_dp/icones/cubo_do_explorador_altissimo.png": {"sha256": "20251ab36c9e33e2115314a1aa51b3f9ae0da54e49caeaee943f2c1a36909911", "tamanho": 9827},
     "padroes/loja_dp/icones/cubo_do_explorador_alto.png": {"sha256": "f5ba4e440c7f1dcbf49860ef5e23babd7bb4da5d32e1cedb1f0a1625997f4ac1", "tamanho": 9838},
     "padroes/loja_dp/icones/cubo_do_explorador_medio.png": {"sha256": "77f23a21cb49c66941e429a6160430460800810f9ca6102bcbaa763ef26f10c4", "tamanho": 9850},
+    "padroes/loja_dp/npc_peticia.png": {"origem": "0.1.11", "sha256": "d78ce4e07cf53ce31da7f4fa0b64c7c015fa584f77a49e0b02c284812897f350", "tamanho": 8991},
     "pip-freeze.txt": {"sha256": "7cdd95617888b5e6b91aed8481fe6bc78f2f96129ac1828409bf5f42d3617ebb", "tamanho": 244},
     "psutil/_psutil_windows.pyd": {"sha256": "0035450801bd7d938e9e146c5ec28e619cb5a5f4a18cdc53ac7e9734c7f94f78", "tamanho": 70656},
     "pyexpat.pyd": {"sha256": "d615e193d1affcdbfe504e90d3621cbdcff94bf72b79d899126534507fd6d27a", "tamanho": 205304},
@@ -1136,6 +1137,6 @@
     "unicodedata.pyd": {"sha256": "208ee1cd3cbad0828433ca7246b05be2b1ff5569983d27d296c0b38888585488", "tamanho": 1140592},
     "vcruntime140.dll": {"sha256": "052ad6a20d375957e82aa6a3c441ea548d89be0981516ca7eb306e063d5027f4", "tamanho": 120400},
     "vcruntime140_1.dll": {"sha256": "6a99bc0128e0c7d6cbbf615fcc26909565e17d4ca3451b97f8987f9c6acbc6c8", "tamanho": 49776},
-    "versao.txt": {"origem": "0.1.10", "sha256": "8a448394dabf3721284d94fa1e70d8e44cae3c6ea6ea83574c342b3a82131f07", "tamanho": 6}
+    "versao.txt": {"origem": "0.1.11", "sha256": "afe8ea1f39bac3f44982642819355739df5438907aaad55617fb4f981491c62f", "tamanho": 6}
   }
 }

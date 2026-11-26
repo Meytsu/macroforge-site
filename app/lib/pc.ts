@@ -6,7 +6,7 @@
  * COMO ATUALIZAR A CADA VERSÃO: compilar (pc/instalador/compilar.ps1 no repo privado), criar a release
  * `pc-v<versão>` aqui com o arquivo `MacroForge-PC-Setup-<versão>.exe` e trocar PC_VERSAO abaixo.
  */
-export const PC_VERSAO = "0.1.10";
+export const PC_VERSAO = "0.1.11";
 
 export const URL_INSTALADOR_PC =
   `https://github.com/Meytsu/macroforge-site/releases/download/pc-v${PC_VERSAO}/MacroForge-PC-Setup-${PC_VERSAO}.exe`;
@@ -21,13 +21,10 @@ export const URL_INSTALADOR_PC =
  * ⚠️ O CHANGELOG É LIDO PELO CLIENTE na janela da atualização. Não anunciar o que não funciona.
  */
 export const PC_CHANGELOG: string[] = [
-  "Nova aba Início: a sua conta, o tempo que falta do plano, os planos para assinar ou renovar e as novidades de cada versão. Pagou? O programa avisa assim que o plano entra.",
-  "Tema claro e escuro, com as cores do app (Configurações → Aparência).",
-  "Tela de login nova, com \"Esqueceu a senha?\" e \"Criar conta\".",
-  "A tela dos Androids ficou nítida nos Monitores, na tela ampliada e na tela cheia.",
-  "Depois de atualizar, o programa abre de novo sozinho.",
-  "Coleção/Alquimia, Loja de DP e Configurações mais organizadas.",
-  "Os Tokens de Prata e de Ouro são reconhecidos com mais precisão.",
+  "Compra no Vendedor Unon mais firme em computadores mais simples: o robô espera a tela assentar antes de tocar e não abre mais a loja do vizinho no lugar da do Unon.",
+  "Inventário ampliado: as abas extras liberadas (V a VIII) também entram na procura do item.",
+  "Conta Premium: o robô liga o AUTO do Calabouço (o de cima, ao lado da missão).",
+  "Limpar o inventário não apaga mais as Dragonas 2SS.",
 ];
 
 export const PC_URL_ARQUIVOS = "https://github.com/Meytsu/macroforge-site/releases/download";
