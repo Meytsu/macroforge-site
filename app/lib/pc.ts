@@ -6,7 +6,7 @@
  * COMO ATUALIZAR A CADA VERSÃO: compilar (pc/instalador/compilar.ps1 no repo privado), criar a release
  * `pc-v<versão>` aqui com o arquivo `MacroForge-PC-Setup-<versão>.exe` e trocar PC_VERSAO abaixo.
  */
-export const PC_VERSAO = "0.1.11";
+export const PC_VERSAO = "0.1.12";
 
 export const URL_INSTALADOR_PC =
   `https://github.com/Meytsu/macroforge-site/releases/download/pc-v${PC_VERSAO}/MacroForge-PC-Setup-${PC_VERSAO}.exe`;
@@ -21,6 +21,7 @@ export const URL_INSTALADOR_PC =
  * ⚠️ O CHANGELOG É LIDO PELO CLIENTE na janela da atualização. Não anunciar o que não funciona.
  */
 export const PC_CHANGELOG: string[] = [
+  "Correção: a Compra em Massa no Vendedor Unon cancelava algumas quantidades (como 10 de uma vez). Agora compra qualquer quantidade de 1 a 50.",
   "Compra no Vendedor Unon mais firme em computadores mais simples: o robô espera a tela assentar antes de tocar e não abre mais a loja do vizinho no lugar da do Unon.",
   "Inventário ampliado: as abas extras liberadas (V a VIII) também entram na procura do item.",
   "Conta Premium: o robô liga o AUTO do Calabouço (o de cima, ao lado da missão).",
