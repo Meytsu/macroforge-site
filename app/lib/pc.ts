@@ -23,7 +23,7 @@ export const URL_INSTALADOR_PC =
 export const PC_CHANGELOG: string[] = [
   "Compra no Vendedor Unon: se o jogo levar o personagem a outro NPC (vendedor de armas, armazém…), o programa fecha na hora, teleporta pelo mapa e volta ao Unon sozinho.",
   "Atualização: não é mais preciso abrir o programa duas vezes para atualizar, e ele reabre sozinho no fim.",
-  "Com o programa aberto, uma faixa no alto avisa quando sai uma versão nova (\"Atualizar agora\" quando nenhum robô estiver rodando).",
+  "Com o programa aberto, uma janela avisa quando sai uma versão nova; em \"Depois\", um ícone no canto de cima lembra a atualização.",
   "Correção: a Compra em Massa no Vendedor Unon cancelava algumas quantidades (como 10 de uma vez). Agora compra qualquer quantidade de 1 a 50.",
   "Compra no Vendedor Unon mais firme em computadores mais simples: o robô espera a tela assentar antes de tocar e não abre mais a loja do vizinho no lugar da do Unon.",
   "Inventário ampliado: as abas extras liberadas (V a VIII) também entram na procura do item.",
