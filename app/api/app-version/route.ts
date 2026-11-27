@@ -16,6 +16,17 @@ type Versao = { versionCode: number; versionName: string; changelog: string[] };
 // Todas as versões publicadas, da mais nova para a mais antiga (a 1.0.3 não tem registro).
 const HISTORICO: Versao[] = [
   {
+    versionCode: 12,
+    versionName: "1.3.1",
+    changelog: [
+      "16 novos Macros Forjados.",
+      "Se o personagem morrer na DG, revive no lugar (você escolhe quantas vezes) e depois sai da DG.",
+      "Abre os tokens do evento entre as DGs (opcional, no cartão da DG).",
+      "Correção: a compra no Vendedor Unon se recupera sozinha quando o jogo leva o personagem a outro NPC.",
+      "Busca na loja dos Macros Forjados e histórico de versões na tela Sobre.",
+    ],
+  },
+  {
     versionCode: 11,
     versionName: "1.3.0",
     changelog: [
